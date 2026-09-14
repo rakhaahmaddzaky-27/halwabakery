@@ -261,6 +261,7 @@ export default function Index() {
   const [delivery, setDelivery] = useState<
     "Ambil Langsung di Toko" | "Pengiriman Kurir Pribadi Halwa"
   >("Ambil Langsung di Toko");
+  const [paymentMethod, setPaymentMethod] = useState<"QRIS" | "Tunai">("QRIS");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
@@ -1272,16 +1273,18 @@ export default function Index() {
       )
       .join("\n");
 
+    const paymentText = paymentMethod === "QRIS" ? "QRIS (Scan Barcode)" : "Tunai / Cash";
+
     const message =
       delivery === "Pengiriman Kurir Pribadi Halwa"
         ? `Halo Halwa Bakery, saya mau pesan:\n${lines}\n\n*Total:* ${formatPrice(
             total
-          )}\n*Metode:* Pengiriman Kurir Pribadi Halwa\n*Nama:* ${name.trim()}\n*Alamat Pengiriman:* ${address.trim()}${
+          )}\n*Metode:* Pengiriman Kurir Pribadi Halwa\n*Pembayaran:* ${paymentText}\n*Nama:* ${name.trim()}\n*Alamat Pengiriman:* ${address.trim()}${
             notes.trim() ? `\n*Catatan Kurir:* ${notes.trim()}` : ""
           }`
         : `Halo Halwa Bakery, saya mau pesan:\n${lines}\n\n*Total:* ${formatPrice(
             total
-          )}\n*Metode:* Ambil Langsung di Toko\n*Nama:* ${name.trim()}${
+          )}\n*Metode:* Ambil Langsung di Toko\n*Pembayaran:* ${paymentText}\n*Nama:* ${name.trim()}${
             notes.trim() ? `\n*Catatan Tambahan:* ${notes.trim()}` : ""
           }`;
 
@@ -2386,8 +2389,12 @@ export default function Index() {
                       </div>
                     )}
 
-                    {/* Stiker Logo Bank & QRIS di Bagian Bawah Form Pemesanan */}
-                    <PaymentLogos variant="detailed" className="mt-5" />
+                    {/* Pilihan Metode Pembayaran Bersih (QRIS & Tunai) */}
+                    <PaymentLogos
+                      className="mt-5"
+                      selectedMethod={paymentMethod}
+                      onSelectMethod={setPaymentMethod}
+                    />
                   </div>
                 </>
               )}
@@ -2414,7 +2421,6 @@ export default function Index() {
                 <p className="mt-2 text-center text-[11px] text-muted-foreground">
                   Format pesanan akan otomatis terbuat di chat WhatsApp
                 </p>
-                <PaymentLogos variant="compact" />
               </div>
             )}
           </aside>
