@@ -16,7 +16,14 @@ export default defineConfig(() => {
           'pwa-192x192.png',
           'pwa-512x512.png',
           'assets/halwa-emblem.svg',
-          'assets/products/*.jpg',
+          'assets/hero.jpg',
+          'assets/products/roti-sosis.jpg',
+          'assets/products/roti-keju.jpg',
+          'assets/products/roti-coklat.jpg',
+          'assets/products/roti-nanas.jpg',
+          'assets/products/roti-srikaya.jpg',
+          'assets/products/brownies.jpg',
+          'assets/products/kue-kacang.jpg',
         ],
         manifest: {
           id: '/',
@@ -50,6 +57,9 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff,woff2}'],
           runtimeCaching: [
             {
@@ -81,16 +91,16 @@ export default defineConfig(() => {
               },
             },
             {
-              urlPattern: /\/assets\/products\/.*\.(?:png|jpg|jpeg|svg|webp)$/i,
+              urlPattern: /\/assets\/(?:products\/.*|hero\.(?:jpg|png))$/i,
               handler: 'StaleWhileRevalidate',
               options: {
-                cacheName: 'halwa-product-photos',
+                cacheName: 'halwa-product-photos-v3',
                 expiration: {
                   maxEntries: 50,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
                 },
                 cacheableResponse: {
-                  statuses: [0, 200],
+                  statuses: [200],
                 },
               },
             },

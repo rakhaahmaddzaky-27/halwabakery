@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { halwaMark, heroFallback, productFallbackImage } from "@/src/assets/fallbacks.ts";
 import { defaultProductImages, officialProductImages } from "@/src/assets/productImages.ts";
+import { REAL_HERO_IMAGE, REAL_PRODUCT_IMAGES } from "@/src/assets/realPhotos.ts";
 import { WhatsAppIcon } from "@/src/components/WhatsAppIcon.tsx";
 import { FloatingWhatsApp } from "@/src/components/FloatingWhatsApp.tsx";
 import { PWAInstallButton } from "@/src/components/PWAInstallButton.tsx";
@@ -829,23 +830,31 @@ export default function Index() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [heroImage, setHeroImage] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("halwa_hero_image") || "/assets/hero.jpg";
+      const saved = localStorage.getItem("halwa_hero_image");
+      if (saved && saved.trim() !== "" && saved !== "/assets/hero.jpg") {
+        return saved;
+      }
     }
-    return "/assets/hero.jpg";
+    return REAL_HERO_IMAGE;
   });
   const [isDragging, setIsDragging] = useState(false);
 
-  // Product Images State (saved in localStorage)
+  // Product Images State (saved in localStorage, defaulting to authentic bakery photos)
   const [productImages, setProductImages] = useState<Record<number, string>>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("halwa_product_images");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+            return { ...REAL_PRODUCT_IMAGES, ...parsed };
+          }
+        }
       } catch {
         // ignore
       }
     }
-    return {};
+    return { ...REAL_PRODUCT_IMAGES };
   });
 
   const [isPhotoManagerOpen, setIsPhotoManagerOpen] = useState(false);
