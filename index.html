@@ -11,16 +11,54 @@
     <script>
       // Filter benign Vite HMR websocket reconnection notices in sandboxed preview
       (function() {
-        var _err = console.error;
-        console.error = function() {
-          if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('[vite]') !== -1) return;
-          return _err.apply(console, arguments);
-        };
-        var _warn = console.warn;
-        console.warn = function() {
-          if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('[vite]') !== -1) return;
-          return _warn.apply(console, arguments);
-        };
+        function hasVite(args) {
+          for (var i = 0; i < args.length; i++) {
+            try {
+              var s = typeof args[i] === 'object' ? JSON.stringify(args[i]) : String(args[i]);
+              if (s && s.toLowerCase().indexOf('vite') !== -1) return true;
+            } catch (e) {}
+          }
+          return false;
+        }
+
+        ['error', 'warn', 'log', 'info', 'debug'].forEach(function(m) {
+          var orig = console[m];
+          if (!orig) return;
+          console[m] = function() {
+            if (hasVite(arguments)) return;
+            return orig.apply(console, arguments);
+          };
+        });
+
+        // Shim WebSocket for vite-hmr protocol so browser network error is prevented
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var RealWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var isVite = (typeof protocols === 'string' && protocols.indexOf('vite') !== -1) ||
+                         (Array.isArray(protocols) && protocols.some(function(p) { return typeof p === 'string' && p.indexOf('vite') !== -1; })) ||
+                         (typeof url === 'string' && url.indexOf('vite-hmr') !== -1);
+            if (isVite) {
+              return {
+                readyState: 3,
+                send: function() {},
+                close: function() {},
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                dispatchEvent: function() { return false; },
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null
+              };
+            }
+            return new RealWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = RealWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
       })();
     </script>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

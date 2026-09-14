@@ -513,21 +513,22 @@ export default function Index() {
         const data = await res.json();
         if (!isMounted) return;
 
-        if (data.stock && typeof data.stock === "object") {
+        if (data.stock && typeof data.stock === "object" && Object.keys(data.stock).length > 0) {
           setStock((prev) => ({ ...prev, ...data.stock }));
           try {
             localStorage.setItem("halwa_product_stock", JSON.stringify(data.stock));
           } catch {}
         }
 
-        if (data.productImages && typeof data.productImages === "object") {
+        const serverHasPhotos = data.productImages && typeof data.productImages === "object" && Object.keys(data.productImages).length > 0;
+        if (serverHasPhotos) {
           setProductImages((prev) => ({ ...prev, ...data.productImages }));
           try {
             localStorage.setItem("halwa_product_images", JSON.stringify(data.productImages));
           } catch {}
         }
 
-        if (data.heroImage) {
+        if (data.heroImage && data.heroImage.trim() !== "") {
           setHeroImage(data.heroImage);
           try {
             localStorage.setItem("halwa_hero_image", data.heroImage);
@@ -562,7 +563,7 @@ export default function Index() {
           }).catch(() => {});
         }
 
-        // Auto-migration: Jika di laptop tersimpan foto banner utama, sinkronkan ke server agar HP langsung menerima foto yang sama
+        // Auto-migration: Jika di laptop tersimpan foto banner utama, sinkronkan ke server agar HP & pengunjung langsung menerima foto yang sama
         if (localHero && localHero.trim() !== "" && (!data.heroImage || data.heroImage.trim() === "")) {
           fetch("/api/store/images", {
             method: "POST",
@@ -571,10 +572,12 @@ export default function Index() {
           }).catch(() => {});
         }
 
-        if (localPhotosStr && (!data.productImages || Object.keys(data.productImages).length === 0)) {
+        // Auto-migration: Jika di laptop tersimpan foto produk asli, dorong ke server agar semua perangkat/teman mendapatkan foto yang sama
+        if (localPhotosStr && !serverHasPhotos) {
           try {
             const parsedPhotos = JSON.parse(localPhotosStr);
             if (parsedPhotos && Object.keys(parsedPhotos).length > 0) {
+              setProductImages((prev) => ({ ...prev, ...parsedPhotos }));
               fetch("/api/store/images", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -842,7 +845,50 @@ export default function Index() {
   const [urlInputProductId, setUrlInputProductId] = useState<number | null>(null);
   const [customUrlInput, setCustomUrlInput] = useState("");
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null);
+  const [isPublishingPhotos, setIsPublishingPhotos] = useState(false);
+  const [publishToastMsg, setPublishToastMsg] = useState<string | null>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
+
+  const pushAllPhotosToServer = async () => {
+    setIsPublishingPhotos(true);
+    setPublishToastMsg(null);
+    try {
+      const photosToPush = { ...productImages };
+      // Fallback check from localStorage
+      if (Object.keys(photosToPush).length === 0) {
+        const local = localStorage.getItem("halwa_product_images");
+        if (local) {
+          try {
+            Object.assign(photosToPush, JSON.parse(local));
+          } catch {}
+        }
+      }
+
+      const heroToPush = heroImage || localStorage.getItem("halwa_hero_image") || "";
+
+      const res = await fetch("/api/store/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productImages: photosToPush,
+          heroImage: heroToPush,
+        }),
+      });
+
+      if (res.ok) {
+        setPublishToastMsg("Semua foto berhasil disimpan permanen ke server! Teman, pelanggan, dan semua pengunjung kini dapat melihat foto asli Halwa Bakery Anda.");
+      } else {
+        setPublishToastMsg("Gagal menyimpan ke server. Mohon periksa koneksi dan coba lagi.");
+      }
+    } catch (e) {
+      setPublishToastMsg("Gagal menyimpan ke server. Mohon periksa koneksi dan coba lagi.");
+    } finally {
+      setIsPublishingPhotos(false);
+      setTimeout(() => {
+        setPublishToastMsg(null);
+      }, 7000);
+    }
+  };
 
   const saveProductImage = (productId: number, dataUrl: string) => {
     setProductImages((prev) => {
@@ -2184,6 +2230,39 @@ export default function Index() {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+              {/* Card Publikasi Permanen ke Server */}
+              <div className="rounded-2xl border border-primary/30 bg-primary-soft/40 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-sm font-bold text-foreground">
+                      Sinkronisasi Foto ke Semua Pengunjung
+                    </span>
+                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
+                      Live Server
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
+                    Pastikan teman, pelanggan di HP lain, dan semua pengunjung website melihat foto roti asli Halwa Bakery Anda secara seragam.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={pushAllPhotosToServer}
+                  disabled={isPublishingPhotos}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-gold hover:bg-primary-strong active:scale-95 transition cursor-pointer disabled:opacity-60 shrink-0 min-h-10"
+                >
+                  <RefreshCw size={14} className={isPublishingPhotos ? "animate-spin" : ""} />
+                  <span>{isPublishingPhotos ? "Menyimpan ke Server..." : "Publikasikan Foto ke Server"}</span>
+                </button>
+              </div>
+
+              {publishToastMsg && (
+                <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-bold text-white shadow-soft transition-all">
+                  <CheckCircle2 size={18} className="shrink-0" />
+                  <span>{publishToastMsg}</span>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-primary/20 bg-primary-soft/50 p-3.5 text-xs text-foreground/85 flex items-start gap-2.5">
                 <Upload size={16} className="text-primary shrink-0 mt-0.5" />
                 <p>

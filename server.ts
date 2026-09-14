@@ -24,6 +24,36 @@ const defaultData: StoreData = {
   lastSyncTime: "",
 };
 
+const PRODUCT_FILE_MAP: Record<number, string> = {
+  1: "roti-sosis.jpg",
+  2: "roti-keju.jpg",
+  3: "roti-coklat.jpg",
+  4: "roti-nanas.jpg",
+  5: "roti-srikaya.jpg",
+  6: "brownies.jpg",
+  7: "kue-kacang.jpg",
+};
+
+function saveBase64ToFile(dataUrl: string, targetFilePaths: string[]): boolean {
+  if (!dataUrl || typeof dataUrl !== "string") return false;
+  const match = dataUrl.match(/^data:image\/[a-zA-Z0-9+-]+;base64,(.+)$/);
+  if (!match || !match[1]) return false;
+  try {
+    const buffer = Buffer.from(match[1], "base64");
+    for (const filePath of targetFilePaths) {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(filePath, buffer);
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to save image file:", err);
+    return false;
+  }
+}
+
 function readStore(): StoreData {
   try {
     if (!fs.existsSync(DATA_DIR)) {
@@ -133,14 +163,37 @@ async function startServer() {
   app.post("/api/store/images", (req, res) => {
     const { productImages, heroImage, resetAll } = req.body;
     const store = readStore();
+
     if (resetAll) {
       store.productImages = {};
     } else if (productImages && typeof productImages === "object") {
       store.productImages = { ...store.productImages, ...productImages };
+      // Save each product image directly to public/assets/products/<filename>
+      for (const [idStr, dataUrl] of Object.entries(productImages)) {
+        const id = Number(idStr);
+        const fileName = PRODUCT_FILE_MAP[id];
+        if (fileName && typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
+          const targets = [
+            path.join(process.cwd(), "public", "assets", "products", fileName),
+            path.join(process.cwd(), "dist", "assets", "products", fileName),
+          ];
+          saveBase64ToFile(dataUrl, targets);
+        }
+      }
     }
-    if (typeof heroImage === "string") {
+
+    if (typeof heroImage === "string" && heroImage.trim() !== "") {
       store.heroImage = heroImage;
+      if (heroImage.startsWith("data:image/")) {
+        const targets = [
+          path.join(process.cwd(), "public", "assets", "hero.jpg"),
+          path.join(process.cwd(), "dist", "assets", "hero.jpg"),
+          path.join(process.cwd(), "public", "assets", "current_hero.jpg"),
+        ];
+        saveBase64ToFile(heroImage, targets);
+      }
     }
+
     writeStore(store);
     res.json({ success: true, productImages: store.productImages, heroImage: store.heroImage });
   });
