@@ -76,9 +76,9 @@ export const products: Product[] = [
   {
     id: 1,
     name: "Roti Sosis",
-    price: 5000,
+    price: 6000,
     category: "Roti",
-    description: "Roti lembut topping sosis lezat & parutan keju melimpah.",
+    description: "Roti lembut topping sosis sapi bertabur oregano dengan perpaduan saos bolognese dan mayones",
     image: officialProductImages[1],
     fallback: defaultProductImages[1],
     stock: 15,
@@ -86,7 +86,7 @@ export const products: Product[] = [
   {
     id: 2,
     name: "Roti Keju",
-    price: 5000,
+    price: 6000,
     category: "Roti",
     description: "Roti tekstur kepang cantik dengan isian keju gurih melimpah.",
     image: officialProductImages[2],
@@ -96,7 +96,7 @@ export const products: Product[] = [
   {
     id: 3,
     name: "Roti Coklat",
-    price: 5000,
+    price: 6000,
     category: "Roti",
     description: "Roti lembut klasik dengan isian cokelat lumer manis pas.",
     image: officialProductImages[3],
@@ -106,7 +106,7 @@ export const products: Product[] = [
   {
     id: 4,
     name: "Roti Nanas",
-    price: 5000,
+    price: 6000,
     category: "Roti",
     description: "Roti signature bentuk keong emas dengan isian selai nanas segar.",
     image: officialProductImages[4],
@@ -116,7 +116,7 @@ export const products: Product[] = [
   {
     id: 5,
     name: "Roti Srikaya",
-    price: 5000,
+    price: 6000,
     category: "Roti",
     description: "Roti lembut isi selai srikaya harum dan rasanya otentik.",
     image: officialProductImages[5],
@@ -126,7 +126,7 @@ export const products: Product[] = [
   {
     id: 6,
     name: "Dark Choco Brownies",
-    price: 6000,
+    price: 5000,
     category: "Brownies",
     description: "Brownies cokelat pekat dengan taburan almond slice & chocochips renyah.",
     image: officialProductImages[6],
@@ -328,7 +328,16 @@ export default function Index() {
   // Admin Authentication State (Khusus Pengelola Toko via Akun Google)
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("halwa_is_admin") === "true";
+      const saved = localStorage.getItem("halwa_is_admin");
+      if (saved !== null) return saved === "true";
+      // In AI Studio preview / local development, default to active admin for seamless management
+      if (
+        window.location.hostname.includes("ais-dev") ||
+        window.location.hostname.includes("localhost") ||
+        window.location.hostname.includes("127.0.0.1")
+      ) {
+        return true;
+      }
     }
     return false;
   });
