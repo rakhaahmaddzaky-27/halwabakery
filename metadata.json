@@ -1,0 +1,6 @@
+{
+  "name": "Halwa Bakery",
+  "description": "Pesan roti, brownies, dan aneka kue artisan segar dan 100% halal dari Halwa Bakery langsung via WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

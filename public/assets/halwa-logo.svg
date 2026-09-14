@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="95 65 310 295" width="100%" height="100%">
+  <!-- Halwa Bakery Official Brand Logo -->
+  <g transform="translate(250, 190)">
+    <!-- Golden arched crescent -->
+    <path d="M-82,25 C-76,-62 -30,-112 0,-112 C34,-112 74,-66 84,28" 
+          fill="none" 
+          stroke="#C89B3C" 
+          stroke-width="5.5" 
+          stroke-linecap="round" />
+    
+    <!-- Centered wheat stalk -->
+    <g transform="translate(0, -68)">
+      <!-- Central stem -->
+      <line x1="0" y1="36" x2="0" y2="-28" stroke="#C89B3C" stroke-width="4" stroke-linecap="round" />
+      
+      <!-- Top tip -->
+      <path d="M0,-28 C-3,-36 0,-43 0,-44 C0,-43 3,-36 0,-28 Z" fill="#C89B3C" />
+      
+      <!-- Wheat grains -->
+      <path d="M0,-20 C-9,-27 -14,-18 -7,-12 C-3,-9 0,-13 0,-20 Z" fill="#C89B3C" />
+      <path d="M0,-20 C9,-27 14,-18 7,-12 C3,-9 0,-13 0,-20 Z" fill="#C89B3C" />
+      
+      <path d="M0,-8 C-11,-16 -16,-7 -9,0 C-4,3 0,-1 0,-8 Z" fill="#C89B3C" />
+      <path d="M0,-8 C11,-16 16,-7 9,0 C4,3 0,-1 0,-8 Z" fill="#C89B3C" />
+      
+      <path d="M0,5 C-12,-3 -17,6 -10,12 C-5,15 0,11 0,5 Z" fill="#C89B3C" />
+      <path d="M0,5 C12,-3 17,6 10,12 C5,15 0,11 0,5 Z" fill="#C89B3C" />
+      
+      <path d="M0,18 C-12,11 -16,19 -9,25 C-5,28 0,24 0,18 Z" fill="#C89B3C" />
+      <path d="M0,18 C12,11 16,19 9,25 C5,28 0,24 0,18 Z" fill="#C89B3C" />
+    </g>
+  </g>
+
+  <!-- Halwa display lettering in Deep Dark Brown -->
+  <text x="250" y="295" 
+        font-family="'Playfair Display', Georgia, 'Times New Roman', serif" 
+        font-size="98" 
+        font-weight="700" 
+        fill="#5A3623" 
+        text-anchor="middle" 
+        letter-spacing="-1">Halwa</text>
+
+  <!-- BAKERY subtitle in Warm Gold -->
+  <text x="250" y="342" 
+        font-family="'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif" 
+        font-size="22" 
+        font-weight="800" 
+        fill="#C89B3C" 
+        text-anchor="middle" 
+        letter-spacing="9">BAKERY</text>
+</svg>

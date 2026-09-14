@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #F7F2E8;
+  --color-foreground: #5A3623;
+  --color-card: #FFFFFF;
+  --color-border: #E8DECD;
+  --color-input: #E4D9C7;
+
+  --color-primary: #C89B3C;
+  --color-primary-soft: #F4EBD8;
+  --color-primary-strong: #AF842D;
+  --color-primary-foreground: #FFFFFF;
+
+  --color-muted: #EFE6D6;
+  --color-muted-foreground: #7E5F4E;
+
+  --color-destructive: #DC2626;
+  --color-destructive-soft: #FEE2E2;
+
+  --color-whatsapp: #25D366;
+  --color-whatsapp-foreground: #FFFFFF;
+
+  --color-overlay: rgba(46, 26, 16, 0.45);
+
+  --shadow-soft: 0 4px 20px -2px rgba(90, 54, 35, 0.06), 0 2px 6px -1px rgba(90, 54, 35, 0.04);
+  --shadow-lift: 0 18px 32px -8px rgba(90, 54, 35, 0.12), 0 6px 12px -4px rgba(90, 54, 35, 0.06);
+  --shadow-gold: 0 10px 22px -4px rgba(200, 155, 60, 0.32);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-left {
+  animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
