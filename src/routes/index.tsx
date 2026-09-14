@@ -8,6 +8,8 @@ import {
   CheckCircle,
   CheckCircle2,
   ChevronRight,
+  Cloud,
+  CloudUpload,
   ExternalLink,
   FileSpreadsheet,
   Flame,
@@ -33,7 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { halwaMark, heroFallback, productFallbackImage } from "@/src/assets/fallbacks.ts";
-import { defaultProductImages } from "@/src/assets/productImages.ts";
+import { defaultProductImages, officialProductImages } from "@/src/assets/productImages.ts";
 import { WhatsAppIcon } from "@/src/components/WhatsAppIcon.tsx";
 import { FloatingWhatsApp } from "@/src/components/FloatingWhatsApp.tsx";
 import { PWAInstallButton } from "@/src/components/PWAInstallButton.tsx";
@@ -48,6 +50,12 @@ import {
   fetchStockFromGoogleSheets,
   isRunningInIframe,
 } from "@/src/services/googleSheets.ts";
+import {
+  uploadProductImageToFirebase,
+  uploadHeroImageToFirebase,
+  isFirebaseImageUrl,
+  storageBucket,
+} from "@/src/services/firebaseStorage.ts";
 import type { User } from "firebase/auth";
 
 export type Category = "Semua" | "Roti" | "Brownies" | "Kue";
@@ -70,7 +78,7 @@ export const products: Product[] = [
     price: 5000,
     category: "Roti",
     description: "Roti lembut topping sosis lezat & parutan keju melimpah.",
-    image: "/assets/products/roti-sosis.jpg",
+    image: officialProductImages[1],
     fallback: defaultProductImages[1],
     stock: 15,
   },
@@ -80,7 +88,7 @@ export const products: Product[] = [
     price: 5000,
     category: "Roti",
     description: "Roti tekstur kepang cantik dengan isian keju gurih melimpah.",
-    image: "/assets/products/roti-keju.jpg",
+    image: officialProductImages[2],
     fallback: defaultProductImages[2],
     stock: 12,
   },
@@ -90,7 +98,7 @@ export const products: Product[] = [
     price: 5000,
     category: "Roti",
     description: "Roti lembut klasik dengan isian cokelat lumer manis pas.",
-    image: "/assets/products/roti-coklat.jpg",
+    image: officialProductImages[3],
     fallback: defaultProductImages[3],
     stock: 10,
   },
@@ -100,7 +108,7 @@ export const products: Product[] = [
     price: 5000,
     category: "Roti",
     description: "Roti signature bentuk keong emas dengan isian selai nanas segar.",
-    image: "/assets/products/roti-nanas.jpg",
+    image: officialProductImages[4],
     fallback: defaultProductImages[4],
     stock: 8,
   },
@@ -110,7 +118,7 @@ export const products: Product[] = [
     price: 5000,
     category: "Roti",
     description: "Roti lembut isi selai srikaya harum dan rasanya otentik.",
-    image: "/assets/products/roti-srikaya.jpg",
+    image: officialProductImages[5],
     fallback: defaultProductImages[5],
     stock: 4,
   },
@@ -120,7 +128,7 @@ export const products: Product[] = [
     price: 6000,
     category: "Brownies",
     description: "Brownies cokelat pekat dengan taburan almond slice & chocochips renyah.",
-    image: "/assets/products/brownies.jpg",
+    image: officialProductImages[6],
     fallback: defaultProductImages[6],
     stock: 15,
   },
@@ -130,7 +138,7 @@ export const products: Product[] = [
     price: 2000,
     category: "Kue",
     description: "Kue kacang renyah berbentuk hati dengan kemasan estetik.",
-    image: "/assets/products/kue-kacang.jpg",
+    image: officialProductImages[7],
     fallback: defaultProductImages[7],
     stock: 20,
   },
@@ -847,6 +855,18 @@ export default function Index() {
   const [dragOverCardId, setDragOverCardId] = useState<number | null>(null);
   const [isPublishingPhotos, setIsPublishingPhotos] = useState(false);
   const [publishToastMsg, setPublishToastMsg] = useState<string | null>(null);
+  const [uploadingProductIds, setUploadingProductIds] = useState<Record<number, boolean>>({});
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [isUploadingAllToFirebase, setIsUploadingAllToFirebase] = useState(false);
+  const [firebaseUploadProgress, setFirebaseUploadProgress] = useState<{
+    current: number;
+    total: number;
+    name?: string;
+  } | null>(null);
+  const [firebaseStatusMsg, setFirebaseStatusMsg] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const productFileInputRef = useRef<HTMLInputElement>(null);
 
   const pushAllPhotosToServer = async () => {
@@ -888,6 +908,128 @@ export default function Index() {
         setPublishToastMsg(null);
       }, 7000);
     }
+  };
+
+  const uploadSingleProductToFirebase = async (productId: number) => {
+    const dataUrl = productImages[productId];
+    if (!dataUrl) return;
+    if (isFirebaseImageUrl(dataUrl)) {
+      setFirebaseStatusMsg({
+        type: "info",
+        text: `Foto ${products.find((p) => p.id === productId)?.name || "produk"} sudah tersimpan di Firebase Cloud Storage.`,
+      });
+      setTimeout(() => setFirebaseStatusMsg(null), 5000);
+      return;
+    }
+
+    setUploadingProductIds((prev) => ({ ...prev, [productId]: true }));
+    setFirebaseStatusMsg(null);
+    try {
+      const { url } = await uploadProductImageToFirebase(productId, dataUrl);
+      saveProductImage(productId, url);
+      setFirebaseStatusMsg({
+        type: "success",
+        text: `Foto ${products.find((p) => p.id === productId)?.name || "produk"} berhasil disimpan ke Firebase Cloud Storage!`,
+      });
+    } catch (err: any) {
+      console.warn("Upload ke Firebase Storage gagal:", err);
+      setFirebaseStatusMsg({
+        type: "info",
+        text: `Gagal upload ke Firebase: ${err?.message || "Periksa izin penyimpanan"}. Foto tetap tersimpan di server lokal.`,
+      });
+    } finally {
+      setUploadingProductIds((prev) => ({ ...prev, [productId]: false }));
+      setTimeout(() => setFirebaseStatusMsg(null), 8000);
+    }
+  };
+
+  const uploadAllPhotosToFirebaseStorage = async () => {
+    setIsUploadingAllToFirebase(true);
+    setFirebaseStatusMsg(null);
+
+    const itemsToUpload = products.filter((p) => {
+      const img = productImages[p.id];
+      return img && !isFirebaseImageUrl(img);
+    });
+
+    const needsHero = heroImage && !isFirebaseImageUrl(heroImage) && heroImage.startsWith("data:image/");
+    const totalToUpload = itemsToUpload.length + (needsHero ? 1 : 0);
+
+    if (totalToUpload === 0) {
+      setFirebaseStatusMsg({
+        type: "info",
+        text: "Semua foto roti dan banner sudah tersimpan di Firebase Cloud Storage!",
+      });
+      setIsUploadingAllToFirebase(false);
+      setTimeout(() => setFirebaseStatusMsg(null), 6000);
+      return;
+    }
+
+    setFirebaseUploadProgress({ current: 0, total: totalToUpload });
+    let successCount = 0;
+    const updatedImages = { ...productImages };
+
+    for (let i = 0; i < itemsToUpload.length; i++) {
+      const prod = itemsToUpload[i];
+      setFirebaseUploadProgress({
+        current: i + 1,
+        total: totalToUpload,
+        name: prod.name,
+      });
+
+      const currentData = productImages[prod.id];
+      if (currentData) {
+        try {
+          const { url } = await uploadProductImageToFirebase(prod.id, currentData);
+          updatedImages[prod.id] = url;
+          successCount++;
+        } catch (err: any) {
+          console.error(`Gagal upload produk ${prod.name} ke Firebase Storage:`, err);
+        }
+      }
+    }
+
+    if (needsHero) {
+      setFirebaseUploadProgress({
+        current: totalToUpload,
+        total: totalToUpload,
+        name: "Banner Utama",
+      });
+      try {
+        const { url } = await uploadHeroImageToFirebase(heroImage);
+        setHeroImage(url);
+        try {
+          localStorage.setItem("halwa_hero_image", url);
+        } catch {}
+        await fetch("/api/store/images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ heroImage: url }),
+        });
+        successCount++;
+      } catch (err) {
+        console.error("Gagal upload hero banner ke Firebase Storage:", err);
+      }
+    }
+
+    // Persist all updated Firebase Storage URLs to state, localStorage & backend
+    setProductImages(updatedImages);
+    try {
+      localStorage.setItem("halwa_product_images", JSON.stringify(updatedImages));
+    } catch {}
+    await fetch("/api/store/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productImages: updatedImages }),
+    });
+
+    setFirebaseStatusMsg({
+      type: "success",
+      text: `Selesai! ${successCount} dari ${totalToUpload} foto roti berhasil disimpan ke Firebase Cloud Storage (${storageBucket}). Seluruh pengunjung sekarang mengakses foto dari Google Cloud CDN.`,
+    });
+    setIsUploadingAllToFirebase(false);
+    setFirebaseUploadProgress(null);
+    setTimeout(() => setFirebaseStatusMsg(null), 10000);
   };
 
   const saveProductImage = (productId: number, dataUrl: string) => {
@@ -949,28 +1091,75 @@ export default function Index() {
   };
 
   const handleProductFileInput = async (file: File) => {
-    if (!activeUploadProductId || !file.type.startsWith("image/")) return;
+    const targetId = activeUploadProductId;
+    if (!targetId || !file.type.startsWith("image/")) return;
     const compressed = await compressImageFile(file, 800, 0.85);
-    if (compressed) {
-      saveProductImage(activeUploadProductId, compressed);
+    if (!compressed) return;
+
+    // 1. Simpan langsung secara lokal & server agar cepat terlihat
+    saveProductImage(targetId, compressed);
+
+    // 2. Unggah otomatis ke Firebase Cloud Storage
+    setUploadingProductIds((prev) => ({ ...prev, [targetId]: true }));
+    try {
+      const { url } = await uploadProductImageToFirebase(targetId, compressed);
+      saveProductImage(targetId, url);
+      setFirebaseStatusMsg({
+        type: "success",
+        text: `Foto ${products.find((p) => p.id === targetId)?.name || "produk"} berhasil disimpan ke Firebase Cloud Storage!`,
+      });
+    } catch (err: any) {
+      console.warn("Upload ke Firebase Storage gagal, menggunakan server lokal:", err);
+      setFirebaseStatusMsg({
+        type: "info",
+        text: `Foto tersimpan di server lokal. (Catatan Firebase: ${err?.message || "Storage disiapkan"})`,
+      });
+    } finally {
+      setUploadingProductIds((prev) => ({ ...prev, [targetId]: false }));
+      setTimeout(() => setFirebaseStatusMsg(null), 8000);
     }
   };
 
   const handleHeroFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     const compressed = await compressImageFile(file, 1200, 0.85);
-    if (compressed) {
-      setHeroImage(compressed);
+    if (!compressed) return;
+
+    setHeroImage(compressed);
+    try {
+      localStorage.setItem("halwa_hero_image", compressed);
+    } catch {}
+    fetch("/api/store/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heroImage: compressed }),
+    }).catch(() => {});
+
+    setIsUploadingHero(true);
+    try {
+      const { url } = await uploadHeroImageToFirebase(compressed);
+      setHeroImage(url);
       try {
-        localStorage.setItem("halwa_hero_image", compressed);
-      } catch {
-        // ignore
-      }
+        localStorage.setItem("halwa_hero_image", url);
+      } catch {}
       fetch("/api/store/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ heroImage: compressed }),
+        body: JSON.stringify({ heroImage: url }),
       }).catch(() => {});
+      setFirebaseStatusMsg({
+        type: "success",
+        text: "Banner utama berhasil disimpan ke Firebase Cloud Storage!",
+      });
+    } catch (err: any) {
+      console.warn("Firebase Storage hero notice:", err);
+      setFirebaseStatusMsg({
+        type: "info",
+        text: "Banner utama tersimpan di server lokal.",
+      });
+    } finally {
+      setIsUploadingHero(false);
+      setTimeout(() => setFirebaseStatusMsg(null), 8000);
     }
   };
 
@@ -1554,7 +1743,22 @@ export default function Index() {
                         const file = e.dataTransfer.files?.[0];
                         if (file && file.type.startsWith("image/")) {
                           const compressed = await compressImageFile(file, 800, 0.85);
-                          if (compressed) saveProductImage(product.id, compressed);
+                          if (compressed) {
+                            saveProductImage(product.id, compressed);
+                            setUploadingProductIds((prev) => ({ ...prev, [product.id]: true }));
+                            try {
+                              const { url } = await uploadProductImageToFirebase(product.id, compressed);
+                              saveProductImage(product.id, url);
+                              setFirebaseStatusMsg({
+                                type: "success",
+                                text: `Foto ${product.name} berhasil disimpan ke Firebase Cloud Storage!`,
+                              });
+                            } catch (err) {
+                              console.warn("Firebase Storage direct drop notice:", err);
+                            } finally {
+                              setUploadingProductIds((prev) => ({ ...prev, [product.id]: false }));
+                            }
+                          }
                         }
                       }}
                       className={`relative overflow-hidden bg-muted aspect-square transition-all duration-300 ${
@@ -1581,6 +1785,14 @@ export default function Index() {
                         100% HALAL
                       </div>
 
+                      {/* Firebase Storage Badge (Admin Info) */}
+                      {isAdmin && hasCustomPhoto && isFirebaseImageUrl(currentImage) && (
+                        <div className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-700/90 text-white px-2.5 py-1 text-[10px] font-bold shadow-xs backdrop-blur-xs">
+                          <Cloud size={11} />
+                          <span>Firebase</span>
+                        </div>
+                      )}
+
                       {/* Out of Stock Overlay */}
                       {isOutOfStock && (
                         <div className="absolute inset-0 z-20 flex items-center justify-center bg-foreground/40 backdrop-blur-[2px]">
@@ -1598,11 +1810,21 @@ export default function Index() {
                             e.stopPropagation();
                             triggerUploadForProduct(product.id);
                           }}
-                          className="absolute top-3.5 right-3.5 z-10 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground shadow-soft backdrop-blur-md transition hover:bg-card hover:scale-105 active:scale-95 cursor-pointer"
+                          disabled={uploadingProductIds[product.id]}
+                          className="absolute top-3.5 right-3.5 z-10 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1.5 text-xs font-bold text-foreground shadow-soft backdrop-blur-md transition hover:bg-card hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-75"
                           title={`Upload / ganti foto untuk ${product.name}`}
                         >
-                          <Camera size={13} className="text-primary" />
-                          <span>{hasCustomPhoto ? "Ganti Foto" : "Isi Foto"}</span>
+                          {uploadingProductIds[product.id] ? (
+                            <>
+                              <RefreshCw size={13} className="animate-spin text-primary" />
+                              <span>Mengunggah...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera size={13} className="text-primary" />
+                              <span>{hasCustomPhoto ? "Ganti Foto" : "Isi Foto"}</span>
+                            </>
+                          )}
                         </button>
                       )}
 
@@ -2230,44 +2452,147 @@ export default function Index() {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-              {/* Card Publikasi Permanen ke Server */}
-              <div className="rounded-2xl border border-primary/30 bg-primary-soft/40 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display text-sm font-bold text-foreground">
-                      Sinkronisasi Foto ke Semua Pengunjung
-                    </span>
-                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
-                      Live Server
+              {/* Card Firebase Cloud Storage */}
+              <div className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary-soft/60 to-background p-4 sm:p-5 shadow-xs space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Cloud className="text-primary shrink-0" size={18} />
+                      <span className="font-display text-sm font-bold text-foreground">
+                        Firebase Cloud Storage
+                      </span>
+                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
+                        CDN Cloud Aktif
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
+                      Foto roti Anda disimpan di Google Firebase Storage ({storageBucket}) sehingga dapat diakses secara publik dan cepat oleh teman dan pelanggan di domain website Anda.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={uploadAllPhotosToFirebaseStorage}
+                      disabled={isUploadingAllToFirebase || isPublishingPhotos}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-gold hover:bg-primary-strong active:scale-95 transition cursor-pointer disabled:opacity-60 shrink-0 min-h-10"
+                    >
+                      {isUploadingAllToFirebase ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <CloudUpload size={15} />
+                      )}
+                      <span>
+                        {isUploadingAllToFirebase
+                          ? "Menyimpan ke Firebase..."
+                          : "Unggah Semua ke Firebase Storage"}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={pushAllPhotosToServer}
+                      disabled={isPublishingPhotos || isUploadingAllToFirebase}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted active:scale-95 transition cursor-pointer disabled:opacity-60 shrink-0 min-h-10"
+                      title="Sinkronkan foto ke server toko"
+                    >
+                      <RefreshCw size={13} className={isPublishingPhotos ? "animate-spin" : ""} />
+                      <span>{isPublishingPhotos ? "Sinkron..." : "Sinkron Server"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress Bar Upload Firebase */}
+                {isUploadingAllToFirebase && firebaseUploadProgress && (
+                  <div className="rounded-xl bg-card border border-primary/30 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground flex items-center gap-1.5">
+                        <RefreshCw size={12} className="animate-spin text-primary" />
+                        Mengunggah: {firebaseUploadProgress.name || "Foto"}
+                      </span>
+                      <span className="font-mono text-[11px] font-bold text-primary">
+                        {firebaseUploadProgress.current} / {firebaseUploadProgress.total} foto
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{
+                          width: `${(firebaseUploadProgress.current / firebaseUploadProgress.total) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Status / Notifikasi Firebase */}
+                {firebaseStatusMsg && (
+                  <div
+                    className={`flex items-center gap-2.5 rounded-2xl px-4 py-3 text-xs font-bold shadow-soft transition-all ${
+                      firebaseStatusMsg.type === "success"
+                        ? "bg-emerald-600 text-white"
+                        : firebaseStatusMsg.type === "error"
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-primary text-primary-foreground"
+                    }`}
+                  >
+                    {firebaseStatusMsg.type === "success" ? (
+                      <CheckCircle2 size={18} className="shrink-0" />
+                    ) : (
+                      <AlertCircle size={18} className="shrink-0" />
+                    )}
+                    <span>{firebaseStatusMsg.text}</span>
+                  </div>
+                )}
+
+                {publishToastMsg && !firebaseStatusMsg && (
+                  <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-bold text-white shadow-soft transition-all">
+                    <CheckCircle2 size={18} className="shrink-0" />
+                    <span>{publishToastMsg}</span>
+                  </div>
+                )}
+
+                {/* Ringkasan Status Gambar */}
+                <div className="flex items-center gap-3 pt-1 text-[11px] text-muted-foreground flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span>
+                      Server Website (Publik):{" "}
+                      <strong className="text-foreground">8 foto asli</strong> (Dapat Dilihat Semua Pengunjung)
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
-                    Pastikan teman, pelanggan di HP lain, dan semua pengunjung website melihat foto roti asli Halwa Bakery Anda secara seragam.
-                  </p>
+                  {products.some((p) => isFirebaseImageUrl(productImages[p.id])) && (
+                    <>
+                      <span className="text-border">•</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-blue-500" />
+                        <span>
+                          Firebase Storage CDN:{" "}
+                          <strong className="text-foreground">
+                            {
+                              products.filter((p) => isFirebaseImageUrl(productImages[p.id]))
+                                .length + (isFirebaseImageUrl(heroImage) ? 1 : 0)
+                            }
+                          </strong>{" "}
+                          aset
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={pushAllPhotosToServer}
-                  disabled={isPublishingPhotos}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-gold hover:bg-primary-strong active:scale-95 transition cursor-pointer disabled:opacity-60 shrink-0 min-h-10"
-                >
-                  <RefreshCw size={14} className={isPublishingPhotos ? "animate-spin" : ""} />
-                  <span>{isPublishingPhotos ? "Menyimpan ke Server..." : "Publikasikan Foto ke Server"}</span>
-                </button>
               </div>
 
-              {publishToastMsg && (
-                <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-bold text-white shadow-soft transition-all">
-                  <CheckCircle2 size={18} className="shrink-0" />
-                  <span>{publishToastMsg}</span>
+              {/* Banner Penjelasan Foto Asli Publik */}
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-foreground/90 flex items-start gap-3">
+                <ShieldCheck size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                    Foto Roti Asli Halwa Bakery Otomatis Tampil untuk Semua Pengunjung
+                  </p>
+                  <p className="mt-0.5 text-foreground/80 leading-relaxed">
+                    Ke-8 foto (Foto Banner + 7 Produk Roti Asli) telah tersimpan permanen sebagai aset resmi website Halwa Bakery. Siapapun yang membuka link website Anda di HP, tablet, atau laptop manapun <strong>langsung melihat foto asli ini</strong> tanpa perlu konfigurasi Firebase.
+                  </p>
                 </div>
-              )}
-
-              <div className="rounded-2xl border border-primary/20 bg-primary-soft/50 p-3.5 text-xs text-foreground/85 flex items-start gap-2.5">
-                <Upload size={16} className="text-primary shrink-0 mt-0.5" />
-                <p>
-                  <strong>Cara Mudah:</strong> Klik <em>&ldquo;Pilih Foto&rdquo;</em> pada roti yang ingin Anda pasang gambarnya. Anda juga bisa langsung <strong>seret (drag & drop)</strong> file foto dari komputer ke kartu roti di halaman menu.
-                </p>
               </div>
 
               {/* Foto Banner Utama (Hero Banner di Halaman Depan) */}
@@ -2284,23 +2609,34 @@ export default function Index() {
                         }}
                         className="h-full w-full object-cover"
                       />
+                      {isFirebaseImageUrl(heroImage) && (
+                        <span className="absolute bottom-0 inset-x-0 bg-emerald-700 text-[9px] font-bold text-white text-center py-0.5 flex items-center justify-center gap-0.5">
+                          <Cloud size={9} /> Firebase
+                        </span>
+                      )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-display text-sm font-bold text-foreground">
                           Banner Utama (Halaman Depan)
                         </span>
-                        <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary-strong">
-                          Hero Depan
-                        </span>
+                        {isFirebaseImageUrl(heroImage) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-400">
+                            <Cloud size={10} /> Firebase Storage
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 size={10} /> Foto Asli Banner (Publik)
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Foto roti di bagian paling atas website (otomatis tersinkron ke semua perangkat)
+                        Foto roti di bagian paling atas website (otomatis tampil untuk semua pengunjung)
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <input
                       type="file"
                       id="hero-modal-upload-input"
@@ -2314,11 +2650,56 @@ export default function Index() {
                     <button
                       type="button"
                       onClick={() => document.getElementById("hero-modal-upload-input")?.click()}
-                      className="flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2 text-xs font-bold text-primary-foreground hover:bg-foreground/90 transition active:scale-95 cursor-pointer shadow-xs"
+                      disabled={isUploadingHero}
+                      className="flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2 text-xs font-bold text-primary-foreground hover:bg-foreground/90 transition active:scale-95 cursor-pointer shadow-xs disabled:opacity-70"
                     >
-                      <Camera size={14} />
-                      <span>Pilih Foto Banner</span>
+                      {isUploadingHero ? (
+                        <RefreshCw size={14} className="animate-spin text-primary" />
+                      ) : (
+                        <Camera size={14} />
+                      )}
+                      <span>{isUploadingHero ? "Mengunggah..." : "Pilih Foto Banner"}</span>
                     </button>
+
+                    {heroImage && !isFirebaseImageUrl(heroImage) && heroImage !== "/assets/hero.jpg" && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsUploadingHero(true);
+                          try {
+                            const { url } = await uploadHeroImageToFirebase(heroImage);
+                            setHeroImage(url);
+                            try {
+                              localStorage.setItem("halwa_hero_image", url);
+                            } catch {}
+                            await fetch("/api/store/images", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ heroImage: url }),
+                            });
+                            setFirebaseStatusMsg({
+                              type: "success",
+                              text: "Banner utama berhasil disimpan ke Firebase Cloud Storage!",
+                            });
+                          } catch (err: any) {
+                            setFirebaseStatusMsg({
+                              type: "error",
+                              text: `Gagal upload banner: ${err?.message}`,
+                            });
+                          } finally {
+                            setIsUploadingHero(false);
+                            setTimeout(() => setFirebaseStatusMsg(null), 7000);
+                          }
+                        }}
+                        disabled={isUploadingHero}
+                        className="flex items-center gap-1.5 rounded-xl bg-primary/20 text-primary-strong px-3 py-2 text-xs font-bold hover:bg-primary/30 transition cursor-pointer"
+                        title="Simpan banner ke Firebase Cloud Storage"
+                      >
+                        <CloudUpload size={13} />
+                        <span>Ke Firebase</span>
+                      </button>
+                    )}
+
                     {heroImage && heroImage !== "/assets/hero.jpg" && (
                       <button
                         type="button"
@@ -2347,6 +2728,8 @@ export default function Index() {
                   const hasCustom = Boolean(productImages[p.id]);
                   const currentSrc = productImages[p.id] || p.image;
                   const isEditingUrl = urlInputProductId === p.id;
+                  const isFirebaseStored = isFirebaseImageUrl(currentSrc);
+                  const isUploadingThis = uploadingProductIds[p.id];
 
                   return (
                     <div
@@ -2370,15 +2753,43 @@ export default function Index() {
                             className="h-full w-full object-cover"
                           />
                           {hasCustom && (
-                            <span className="absolute bottom-0 inset-x-0 bg-primary text-[9px] font-bold text-primary-foreground text-center py-0.5">
-                              Foto Asli
+                            <span
+                              className={`absolute bottom-0 inset-x-0 text-[9px] font-bold text-center py-0.5 flex items-center justify-center gap-0.5 ${
+                                isFirebaseStored
+                                  ? "bg-emerald-700 text-white"
+                                  : "bg-primary text-primary-foreground"
+                              }`}
+                            >
+                              {isFirebaseStored ? (
+                                <>
+                                  <Cloud size={9} /> Firebase
+                                </>
+                              ) : (
+                                "Foto Asli"
+                              )}
                             </span>
                           )}
                         </div>
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
-                            {p.category}
-                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                              {p.category}
+                            </span>
+                            {isFirebaseStored ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[9px] font-bold text-blue-700 dark:text-blue-400">
+                                <Cloud size={9} /> Firebase Cloud
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">
+                                <CheckCircle2 size={9} /> Foto Asli (Publik)
+                              </span>
+                            )}
+                            {isUploadingThis && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary animate-pulse">
+                                <RefreshCw size={10} className="animate-spin" /> Uploading ke Firebase...
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-sm font-bold text-foreground">{p.name}</h3>
                           <p className="text-xs font-semibold text-primary-strong">
                             {formatPrice(p.price)}
@@ -2390,11 +2801,29 @@ export default function Index() {
                         <button
                           type="button"
                           onClick={() => triggerUploadForProduct(p.id)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary-strong transition cursor-pointer active:scale-95"
+                          disabled={isUploadingThis}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary-strong transition cursor-pointer active:scale-95 disabled:opacity-70"
                         >
-                          <Upload size={13} />
-                          <span>Pilih Foto</span>
+                          {isUploadingThis ? (
+                            <RefreshCw size={13} className="animate-spin" />
+                          ) : (
+                            <Upload size={13} />
+                          )}
+                          <span>{isUploadingThis ? "Mengunggah..." : "Pilih Foto"}</span>
                         </button>
+
+                        {hasCustom && !isFirebaseStored && (
+                          <button
+                            type="button"
+                            onClick={() => uploadSingleProductToFirebase(p.id)}
+                            disabled={isUploadingThis}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2.5 py-1.5 text-xs font-bold hover:bg-emerald-600/25 transition cursor-pointer disabled:opacity-70"
+                            title="Simpan foto ini ke Firebase Cloud Storage"
+                          >
+                            <CloudUpload size={13} />
+                            <span>Ke Firebase</span>
+                          </button>
+                        )}
 
                         <button
                           type="button"

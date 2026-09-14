@@ -1,5 +1,16 @@
+// Official Halwa Bakery photography assets served statically from the website backend
+export const officialProductImages: Record<number, string> = {
+  1: "/assets/products/roti-sosis.jpg",
+  2: "/assets/products/roti-keju.jpg",
+  3: "/assets/products/roti-coklat.jpg",
+  4: "/assets/products/roti-nanas.jpg",
+  5: "/assets/products/roti-srikaya.jpg",
+  6: "/assets/products/brownies.jpg",
+  7: "/assets/products/kue-kacang.jpg",
+};
+
 // High-quality, warm bakery illustrations embedded as SVG data URIs
-// Guarantees 100% reliable loading on all mobile networks without flaky third-party hosts
+// Guarantees 100% reliable fallback loading on all mobile networks without flaky third-party hosts
 
 export const defaultProductImages: Record<number, string> = {
   // 1: Roti Sosis
