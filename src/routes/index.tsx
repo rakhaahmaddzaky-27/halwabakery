@@ -42,6 +42,7 @@ import { FloatingWhatsApp } from "@/src/components/FloatingWhatsApp.tsx";
 import { PWAInstallButton } from "@/src/components/PWAInstallButton.tsx";
 import { OfflineIndicator } from "@/src/components/OfflineIndicator.tsx";
 import { TestimonialsSection } from "@/src/components/TestimonialsSection.tsx";
+import { PaymentLogos } from "@/src/components/PaymentLogos.tsx";
 import {
   initAuth,
   googleSignIn,
@@ -2384,6 +2385,9 @@ export default function Index() {
                         </label>
                       </div>
                     )}
+
+                    {/* Stiker Logo Bank & QRIS di Bagian Bawah Form Pemesanan */}
+                    <PaymentLogos variant="detailed" className="mt-5" />
                   </div>
                 </>
               )}
@@ -2410,6 +2414,7 @@ export default function Index() {
                 <p className="mt-2 text-center text-[11px] text-muted-foreground">
                   Format pesanan akan otomatis terbuat di chat WhatsApp
                 </p>
+                <PaymentLogos variant="compact" />
               </div>
             )}
           </aside>
