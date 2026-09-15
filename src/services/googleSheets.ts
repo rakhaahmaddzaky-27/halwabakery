@@ -64,6 +64,16 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     const code = error?.code || "";
     const msg = error?.message || "";
 
+    if (code === "auth/unauthorized-domain" || msg.includes("unauthorized-domain")) {
+      const currentHost = typeof window !== "undefined" ? window.location.hostname : "domain Anda";
+      const err = new Error(
+        `Domain "${currentHost}" belum didaftarkan di Authorized Domains Firebase Authentication.`
+      ) as any;
+      err.code = "auth/unauthorized-domain";
+      err.domain = currentHost;
+      throw err;
+    }
+
     if (code === "auth/popup-blocked") {
       const isIframe = isRunningInIframe();
       const guidance = isIframe

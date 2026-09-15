@@ -1,34 +1,56 @@
+
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#C89B3C" />
-      <stop offset="50%" stop-color="#AF842D" />
-      <stop offset="100%" stop-color="#7C4B18" />
-    </linearGradient>
-    <radialGradient id="goldPlate" cx="50%" cy="45%" r="55%">
-      <stop offset="0%" stop-color="#FDF8ED" />
-      <stop offset="70%" stop-color="#F4EBD8" />
-      <stop offset="100%" stop-color="#E2CCA6" />
+    <radialGradient id="creamBgMask" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#FFFDF9" />
+      <stop offset="65%" stop-color="#FAF6EF" />
+      <stop offset="100%" stop-color="#F2ECE0" />
     </radialGradient>
+    <filter id="maskShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#5A3623" flood-opacity="0.08" />
+    </filter>
   </defs>
 
-  <!-- Full bleed background for Android squircle safe-zone -->
-  <rect width="512" height="512" fill="url(#bgGrad)" />
+  <!-- Full-bleed background for Android squircle safe-zone -->
+  <rect width="512" height="512" fill="url(#creamBgMask)" />
 
-  <!-- Outer gold dashed ring -->
-  <circle cx="256" cy="256" r="179.2" fill="none" stroke="#F4EBD8" stroke-width="7.68" stroke-dasharray="10.24 7.68" opacity="0.9" />
+  <!-- Logo Group centered inside 80% safe circle (scale: 0.85) -->
+  <g transform="translate(256, 252) scale(0.85)" filter="url(#maskShadow)">
+    <g transform="translate(0, -68)">
+      <path d="M-86,28 C-80,-64 -32,-116 0,-116 C36,-116 80,-68 90,32" 
+            fill="none" 
+            stroke="#C89B3C" 
+            stroke-width="5.8" 
+            stroke-linecap="round" />
+      
+      <g transform="translate(0, -70)">
+        <line x1="0" y1="38" x2="0" y2="-28" stroke="#C89B3C" stroke-width="4.2" stroke-linecap="round" />
+        <path d="M0,-28 C-3,-36 0,-44 0,-45 C0,-44 3,-36 0,-28 Z" fill="#C89B3C" />
+        <path d="M0,-20 C-10,-28 -15,-18 -7,-12 C-3,-9 0,-13 0,-20 Z" fill="#C89B3C" />
+        <path d="M0,-20 C10,-28 15,-18 7,-12 C3,-9 0,-13 0,-20 Z" fill="#C89B3C" />
+        <path d="M0,-8 C-12,-16 -17,-7 -9,0 C-4,3 0,-1 0,-8 Z" fill="#C89B3C" />
+        <path d="M0,-8 C12,-16 17,-7 9,0 C4,3 0,-1 0,-8 Z" fill="#C89B3C" />
+        <path d="M0,5 C-13,-3 -18,6 -11,12 C-5,15 0,11 0,5 Z" fill="#C89B3C" />
+        <path d="M0,5 C13,-3 18,6 11,12 C5,15 0,11 0,5 Z" fill="#C89B3C" />
+        <path d="M0,18 C-13,11 -17,19 -10,25 C-5,28 0,24 0,18 Z" fill="#C89B3C" />
+        <path d="M0,18 C13,11 17,19 10,25 C5,28 0,24 0,18 Z" fill="#C89B3C" />
+      </g>
+    </g>
 
-  <!-- Inner Cream Plate -->
-  <circle cx="256" cy="256" r="157.696" fill="url(#goldPlate)" stroke="#AF842D" stroke-width="5.12" />
+    <text x="0" y="44" 
+          font-family="Playfair Display, Georgia, serif" 
+          font-size="106" 
+          font-weight="700" 
+          fill="#542817" 
+          text-anchor="middle" 
+          letter-spacing="-1">Halwa</text>
 
-  <!-- Wheat stalk wreath decorative arc -->
-  <path d="M 187.904 205.824 C 220.16 166.4 291.84 166.4 324.096 205.824" fill="none" stroke="#AF842D" stroke-width="6.144" stroke-linecap="round" />
-
-  <!-- HALWA Brand Typography -->
-  <text x="256" y="270.96" font-family="serif, Georgia" font-size="68" font-weight="bold" fill="#5A3623" text-anchor="middle" letter-spacing="1">HALWA</text>
-  <text x="256" y="294.08" font-family="sans-serif, Arial" font-size="25" font-weight="900" fill="#AF842D" text-anchor="middle" letter-spacing="5.12">BAKERY</text>
-
-  <!-- Halal pill -->
-  <rect x="175.36" y="304.96" width="161.28" height="36" rx="18" fill="#5A3623" />
-  <text x="256" y="330.96" font-family="sans-serif, Arial" font-size="20" font-weight="bold" fill="#F4EBD8" text-anchor="middle" letter-spacing="0.5">100% HALAL</text>
+    <text x="0" y="96" 
+          font-family="Plus Jakarta Sans, system-ui, sans-serif" 
+          font-size="25" 
+          font-weight="800" 
+          fill="#C89B3C" 
+          text-anchor="middle" 
+          letter-spacing="10">BAKERY</text>
+  </g>
 </svg>
