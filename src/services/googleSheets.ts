@@ -26,11 +26,11 @@ let isSigningIn = false;
 export const getCachedAccessToken = () => cachedAccessToken;
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user) => {
-    if (user && cachedAccessToken) {
+    if (user) {
       onAuthSuccess?.(user, cachedAccessToken);
     } else if (!isSigningIn) {
       cachedAccessToken = null;

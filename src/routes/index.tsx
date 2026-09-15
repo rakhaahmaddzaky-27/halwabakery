@@ -19,7 +19,6 @@ import {
   Heart,
   Image as ImageIcon,
   Instagram,
-  KeyRound,
   Link as LinkIcon,
   Lock,
   LogOut,
@@ -518,51 +517,9 @@ export default function Index() {
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
   const [isHalalDetailModalOpen, setIsHalalDetailModalOpen] = useState(false);
 
-  // Mode Autentikasi Pengelola: Google Login atau PIN Khusus Pemilik Toko
-  const [adminAuthMethod, setAdminAuthMethod] = useState<"google" | "pin">("google");
-  const [adminPinInput, setAdminPinInput] = useState("");
-  const [adminPinError, setAdminPinError] = useState("");
-  const [showAdminPin, setShowAdminPin] = useState(false);
+  // Mode Autentikasi Pengelola: Khusus Akun Google Terdaftar
   const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
   const [copiedDomain, setCopiedDomain] = useState(false);
-
-  // Master PIN bawaan & kustom untuk akses pemilik toko
-  const MASTER_PINS = ["246800", "halwa2026", "190426"];
-
-  const verifyMasterPin = (pin: string): boolean => {
-    const trimmed = pin.trim();
-    if (!trimmed) return false;
-    if (MASTER_PINS.includes(trimmed)) return true;
-    try {
-      const customPin = localStorage.getItem("halwa_custom_admin_pin");
-      if (customPin && customPin === trimmed) return true;
-    } catch {}
-    return false;
-  };
-
-  const handleAdminPinSubmit = (e?: FormEvent) => {
-    if (e) e.preventDefault();
-    setAdminPinError("");
-    if (!adminPinInput.trim()) {
-      setAdminPinError("Silakan masukkan PIN pengelola toko.");
-      return;
-    }
-    if (verifyMasterPin(adminPinInput)) {
-      setIsAdmin(true);
-      try {
-        localStorage.setItem("halwa_is_admin", "true");
-      } catch {}
-      setAdminPinError("");
-      setAdminAuthError("");
-      setAdminPinInput("");
-      setIsAdminAuthModalOpen(false);
-      setProductToast("Berhasil masuk ke Mode Pengelola via PIN Pemilik Toko.");
-      setTimeout(() => setProductToast(null), 3500);
-      openAdminStockModal();
-    } else {
-      setAdminPinError("PIN pengelola tidak cocok. Gunakan PIN pemilik toko (Bawaan: 246800).");
-    }
-  };
 
   // Buka dialog login pengelola jika ada parameter ?admin=true di link web
   useEffect(() => {
@@ -588,13 +545,16 @@ export default function Index() {
           localStorage.setItem("halwa_is_admin", "true");
         } catch {}
         setIsAdminAuthModalOpen(false);
+        setProductToast(`Berhasil masuk sebagai Pengelola: ${email || ""}`);
+        setTimeout(() => setProductToast(null), 3500);
+        openAdminStockModal();
       } else {
         setIsAdmin(false);
         try {
           localStorage.removeItem("halwa_is_admin");
         } catch {}
         setAdminAuthError(
-          "Akses ditolak: Akun Google ini tidak memiliki izin sebagai pengelola toko Halwa Bakery. Silakan gunakan akun Google resmi pemilik toko."
+          `Akses ditolak: Akun Google "${email || "ini"}" tidak terdaftar sebagai pengelola resmi Halwa Bakery. Silakan gunakan akun Google pemilik toko (${PRIMARY_OWNER_EMAIL}).`
         );
       }
     } catch (e: any) {
@@ -607,13 +567,12 @@ export default function Index() {
       if (code === "auth/unauthorized-domain" || msg.includes("unauthorized-domain")) {
         const domain = typeof window !== "undefined" ? window.location.hostname : "halwabakery.my.id";
         setUnauthorizedDomain(domain);
-        setAdminAuthMethod("pin");
         setAdminAuthError(
-          `Domain "${domain}" belum diotorisasi di Firebase Authentication. Masuk langsung menggunakan PIN Pemilik di tab bawah ini.`
+          `Domain "${domain}" belum diotorisasi di Firebase Authentication. Tambahkan domain ini di Firebase Console (Authentication > Settings > Authorized domains).`
         );
       } else if (code === "auth/popup-blocked") {
         setAdminAuthError(
-          "Jendela login diblokir oleh peramban. Jika Anda membuka di dalam preview, silakan buka aplikasi di tab baru agar pop-up diizinkan."
+          "Jendela pop-up login terblokir oleh peramban. Silakan izinkan pop-up atau buka aplikasi di tab baru agar pop-up diizinkan."
         );
       } else {
         setAdminAuthError(e?.message || "Gagal masuk dengan Google. Silakan coba lagi.");
@@ -764,13 +723,13 @@ export default function Index() {
     const unsubscribe = initAuth(
       (user, token) => {
         setGoogleUser(user);
-        setGoogleAccessToken(token);
+        if (token) setGoogleAccessToken(token);
         if (user && isEmailAuthorizedAdmin(user.email)) {
           setIsAdmin(true);
           try {
             localStorage.setItem("halwa_is_admin", "true");
           } catch {}
-        } else {
+        } else if (user) {
           setIsAdmin(false);
           try {
             localStorage.removeItem("halwa_is_admin");
@@ -4260,68 +4219,46 @@ export default function Index() {
             {/* Modal Body */}
             <div className="p-5 sm:p-6 space-y-4">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Untuk menjaga keamanan data toko, fitur kelola stok, sinkronisasi Google Sheets, dan ganti foto menu hanya dapat dibuka melalui verifikasi <strong className="text-foreground">Pemilik Resmi Toko</strong>.
+                Untuk menjaga keamanan data toko, fitur kelola stok, harga menu, tambah varian, dan sinkronisasi Google Sheets hanya dapat dibuka melalui verifikasi <strong className="text-foreground">Akun Google Pemilik Toko</strong>.
               </p>
 
-              {/* Tab Pemilihan Metode: Google vs PIN */}
-              <div className="flex rounded-2xl bg-muted/60 p-1 border border-border">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdminAuthMethod("google");
-                    setAdminPinError("");
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    adminAuthMethod === "google"
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 48 48">
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                  </svg>
-                  <span>Akun Google</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdminAuthMethod("pin");
-                    setAdminAuthError("");
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    adminAuthMethod === "pin"
-                      ? "bg-card text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <KeyRound size={15} />
-                  <span>PIN Pengelola</span>
-                </button>
+              {/* Status Proteksi Privasi & Keamanan */}
+              <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary-soft/30 p-3.5">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary mt-0.5">
+                  <Lock size={16} />
+                </div>
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold text-foreground">Sistem Keamanan Akun Terdaftar</p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    Akses menggunakan otentikasi resmi Google OAuth 2.0. Hanya akun email pemilik yang terdaftar (<span className="font-semibold text-foreground">rakha.ahmad.dzaky@gmail.com</span>) yang diizinkan mengakses panel ini.
+                  </p>
+                </div>
               </div>
 
               {/* Tampilan Khusus Jika Terjadi unauthorized-domain */}
               {unauthorizedDomain && (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-50/70 p-3.5 space-y-2.5 text-xs text-amber-950">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-50/80 p-4 space-y-3 text-xs text-amber-950">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-bold text-amber-900">
-                        Domain Belum Terdaftar di Firebase Auth
+                      <p className="font-bold text-amber-900 text-sm">
+                        Otorisasi Domain Firebase Diperlukan
                       </p>
-                      <p className="text-[11px] text-amber-800 leading-relaxed">
-                        Domain <code className="rounded bg-amber-200/60 px-1 py-0.5 font-mono font-bold text-amber-950">{unauthorizedDomain}</code> perlu didaftarkan di Authorized Domains Firebase Console untuk login Google.
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Domain <code className="rounded bg-amber-200/70 px-1.5 py-0.5 font-mono font-bold text-amber-950">{unauthorizedDomain}</code> belum didaftarkan di <strong>Authorized Domains</strong> Firebase Authentication.
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl bg-card/80 p-2.5 border border-amber-200/80 space-y-2 text-[11px]">
-                    <p className="font-semibold text-foreground">💡 Solusi Cepat dari HP:</p>
-                    <p className="text-muted-foreground">
-                      Gunakan tab <strong>PIN Pengelola</strong> di atas untuk langsung membuka menu toko sekarang juga tanpa perlu setel Firebase!
+                  <div className="rounded-xl bg-card/90 p-3.5 border border-amber-200 space-y-2.5 text-xs">
+                    <p className="font-bold text-foreground">
+                      Langkah Menambahkan Domain (Hanya 1 Kali):
                     </p>
+                    <ol className="list-decimal list-inside space-y-1 text-[11px] text-muted-foreground leading-relaxed">
+                      <li>Buka Firebase Console pada proyek Anda.</li>
+                      <li>Pilih menu <strong>Authentication</strong> &gt; tab <strong>Settings</strong> &gt; <strong>Authorized domains</strong>.</li>
+                      <li>Klik <strong>Add domain</strong>, tempelkan domain berikut, lalu klik <strong>Save</strong>.</li>
+                    </ol>
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
@@ -4332,188 +4269,129 @@ export default function Index() {
                             setTimeout(() => setCopiedDomain(false), 2500);
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-muted/60 px-3 py-2 font-semibold text-xs text-foreground hover:bg-muted transition cursor-pointer"
                       >
-                        {copiedDomain ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                        <span>{copiedDomain ? "Domain Tersalin!" : "Salin Nama Domain"}</span>
+                        {copiedDomain ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        <span>{copiedDomain ? "Domain Disalin!" : `Salin: ${unauthorizedDomain}`}</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setAdminAuthMethod("pin")}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1 font-bold text-primary-foreground hover:bg-primary-strong shadow-xs transition cursor-pointer"
+                      <a
+                        href="https://console.firebase.google.com/project/gen-lang-client-0797374072/authentication/settings"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 font-bold text-xs text-primary-foreground hover:bg-primary-strong shadow-xs transition cursor-pointer"
                       >
-                        <KeyRound size={12} />
-                        <span>Masuk via PIN Sekarang</span>
-                      </button>
+                        <ExternalLink size={13} />
+                        <span>Buka Firebase Console</span>
+                      </a>
                     </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAdminGoogleLogin}
+                      disabled={isAdminLoggingIn}
+                      className="w-full rounded-xl border border-amber-600/30 bg-amber-100/60 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw size={14} className={isAdminLoggingIn ? "animate-spin" : ""} />
+                      <span>Coba Login Google Kembali</span>
+                    </button>
                   </div>
                 </div>
               )}
 
-              {adminAuthError && (
+              {adminAuthError && !unauthorizedDomain && (
                 <div className="flex items-start gap-2.5 rounded-2xl bg-destructive/10 border border-destructive/20 p-3.5 text-xs font-semibold text-destructive leading-relaxed">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
                   <span>{adminAuthError}</span>
                 </div>
               )}
 
-              {/* TAB 1: MASUK DENGAN AKUN GOOGLE */}
-              {adminAuthMethod === "google" && (
-                <div className="space-y-3 pt-1">
-                  {/* Status Proteksi Privasi */}
-                  <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary-soft/30 p-3.5">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-                      <Lock size={16} />
-                    </div>
-                    <div className="space-y-0.5 text-xs">
-                      <p className="font-bold text-foreground">Sistem Akses Tertutup</p>
-                      <p className="text-muted-foreground text-[11px]">
-                        Identitas diverifikasi langsung via Google. Hanya akun pemilik terdaftar yang diizinkan masuk.
-                      </p>
-                    </div>
-                  </div>
-
-                  {googleUser && isEmailAuthorizedAdmin(googleUser.email) ? (
-                    <div className="space-y-3 pt-1">
-                      <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 border border-emerald-500/30 p-3.5 text-emerald-950">
-                        <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-                        <div className="overflow-hidden">
-                          <p className="text-xs font-bold text-emerald-900">Terverifikasi sebagai Pemilik</p>
-                          <p className="text-[11px] text-emerald-700 truncate">{googleUser.email}</p>
-                        </div>
+              {/* Kontainer Login Google */}
+              <div className="space-y-3 pt-1">
+                {googleUser && isEmailAuthorizedAdmin(googleUser.email) ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 border border-emerald-500/30 p-4 text-emerald-950">
+                      <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-emerald-900">Terverifikasi sebagai Pemilik Resmi</p>
+                        <p className="text-xs font-medium text-emerald-700 truncate">{googleUser.email}</p>
                       </div>
-
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setIsAdmin(true);
-                          try {
-                            localStorage.setItem("halwa_is_admin", "true");
-                          } catch {}
-                          setIsAdminAuthModalOpen(false);
-                          openAdminStockModal();
-                        }}
-                        className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-primary-foreground hover:bg-primary-strong shadow-gold min-h-12 cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Boxes size={16} />
-                        <span>Masuk ke Mode Pengelola</span>
-                      </Button>
-
-                      <button
-                        type="button"
-                        onClick={handleAdminGoogleLogin}
-                        className="w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition cursor-pointer py-1"
-                      >
-                        Gunakan Akun Google Lain
-                      </button>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <button
-                        type="button"
-                        onClick={handleAdminGoogleLogin}
-                        disabled={isAdminLoggingIn}
-                        className="w-full flex items-center justify-center gap-3 rounded-2xl border border-border bg-white px-5 py-3.5 text-xs font-bold text-gray-800 shadow-soft hover:bg-gray-50 active:scale-[0.99] transition cursor-pointer disabled:opacity-60 min-h-12"
-                      >
-                        {isAdminLoggingIn ? (
-                          <RefreshCw size={18} className="animate-spin text-primary" />
-                        ) : (
-                          <svg className="h-5 w-5 shrink-0" viewBox="0 0 48 48">
-                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                          </svg>
-                        )}
-                        <span>{isAdminLoggingIn ? "Memverifikasi Akun Google..." : "Masuk dengan Akun Google Pemilik"}</span>
-                      </button>
 
-                      {isRunningInIframe() && (
-                        <div className="pt-1 text-center">
-                          <a
-                            href={typeof window !== "undefined" ? window.location.href : "#"}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
-                          >
-                            <ExternalLink size={13} />
-                            <span>Buka di Tab Baru jika Pop-up Terblokir</span>
-                          </a>
-                        </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setIsAdmin(true);
+                        try {
+                          localStorage.setItem("halwa_is_admin", "true");
+                        } catch {}
+                        setIsAdminAuthModalOpen(false);
+                        openAdminStockModal();
+                      }}
+                      className="w-full rounded-2xl bg-primary py-3.5 text-xs font-bold text-primary-foreground hover:bg-primary-strong shadow-gold min-h-12 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Boxes size={16} />
+                      <span>Masuk ke Panel Mode Pengelola</span>
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={handleAdminGoogleLogin}
+                      className="w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground transition cursor-pointer py-1"
+                    >
+                      Gunakan Akun Google Lain
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleAdminGoogleLogin}
+                      disabled={isAdminLoggingIn}
+                      className="w-full flex items-center justify-center gap-3 rounded-2xl border border-border bg-white px-5 py-3.5 text-xs font-bold text-gray-800 shadow-soft hover:bg-gray-50 active:scale-[0.99] transition cursor-pointer disabled:opacity-60 min-h-12"
+                    >
+                      {isAdminLoggingIn ? (
+                        <RefreshCw size={18} className="animate-spin text-primary" />
+                      ) : (
+                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 48 48">
+                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                        </svg>
                       )}
+                      <span>{isAdminLoggingIn ? "Menghubungkan ke Akun Google..." : "Masuk dengan Akun Google Pemilik"}</span>
+                    </button>
 
-                      <p className="text-center text-[11px] text-muted-foreground leading-relaxed">
-                        Sistem otomatis memvalidasi identitas Google pemilik resmi: <span className="font-semibold text-foreground">rakha.ahmad.dzaky@gmail.com</span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 2: MASUK DENGAN PIN PENGELOLA */}
-              {adminAuthMethod === "pin" && (
-                <form onSubmit={handleAdminPinSubmit} className="space-y-4 pt-1">
-                  <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary-soft/30 p-3.5">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-                      <KeyRound size={16} />
-                    </div>
-                    <div className="space-y-0.5 text-xs">
-                      <p className="font-bold text-foreground">Akses Langsung Tanpa Hambatan Domain</p>
-                      <p className="text-muted-foreground text-[11px]">
-                        Bisa digunakan langsung dari ponsel tanpa perlu konfigurasi domain OAuth Firebase.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                      <span>PIN / Sandi Pengelola Toko</span>
-                      <span className="text-[10px] font-normal text-muted-foreground">PIN Pemilik: 246800</span>
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type={showAdminPin ? "text" : "password"}
-                        inputMode="numeric"
-                        autoComplete="current-password"
-                        placeholder="Masukkan 6-digit PIN pemilik"
-                        value={adminPinInput}
-                        onChange={(e) => {
-                          setAdminPinInput(e.target.value);
-                          if (adminPinError) setAdminPinError("");
-                        }}
-                        className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold tracking-wider text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowAdminPin(!showAdminPin)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground hover:text-foreground transition cursor-pointer"
-                      >
-                        {showAdminPin ? "Sembunyikan" : "Lihat"}
-                      </button>
-                    </div>
-
-                    {adminPinError && (
-                      <p className="text-[11px] font-bold text-destructive flex items-center gap-1.5">
-                        <AlertCircle size={13} />
-                        <span>{adminPinError}</span>
-                      </p>
+                    {isRunningInIframe() && (
+                      <div className="pt-1 text-center">
+                        <a
+                          href={typeof window !== "undefined" ? window.location.href : "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Buka di Tab Baru jika Pop-up Terblokir</span>
+                        </a>
+                      </div>
                     )}
-                  </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full rounded-2xl bg-primary py-3.5 text-xs font-bold text-primary-foreground hover:bg-primary-strong shadow-gold min-h-12 cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <ShieldCheck size={16} />
-                    <span>Masuk ke Mode Pengelola</span>
-                  </Button>
-
-                  <div className="rounded-xl bg-muted/40 p-2.5 text-[11px] text-muted-foreground text-center">
-                    💡 PIN Bawaan Toko: <strong className="text-foreground font-mono">246800</strong> (atau <strong className="text-foreground font-mono">halwa2026</strong>).
+                    <div className="rounded-xl bg-muted/40 p-3 text-center space-y-1 border border-border/50">
+                      <p className="text-[11px] font-semibold text-foreground">
+                        Akun Pengelola Terdaftar:
+                      </p>
+                      <p className="text-xs font-mono font-bold text-primary">
+                        rakha.ahmad.dzaky@gmail.com
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Hanya akun tersebut yang dapat mengakses pengaturan toko dan data stok.
+                      </p>
+                    </div>
                   </div>
-                </form>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
