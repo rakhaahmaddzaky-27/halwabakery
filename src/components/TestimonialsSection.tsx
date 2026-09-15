@@ -18,34 +18,6 @@ export interface Testimonial {
 const TESTIMONIALS_DATA: Testimonial[] = [
   {
     id: "testi-1",
-    name: "Siti Rahmawati",
-    role: "Ibu Rumah Tangga, Sukoharjo",
-    avatarText: "SR",
-    avatarBg: "bg-amber-600",
-    rating: 5,
-    date: "2 hari lalu",
-    comment:
-      "Roti coklatnya lumer pas digigit dan roti kejunya gurih manis seimbang. Teksturnya empuk selembut awan, anak-anak suka banget buat bekal sarapan sekolah. Rasanya premium tapi harganya terjangkau!",
-    favoriteItem: "Roti Coklat & Roti Keju",
-    verified: true,
-    category: "roti",
-  },
-  {
-    id: "testi-2",
-    name: "Dimas Prasetyo",
-    role: "Pecinta Cokelat, Kartasura",
-    avatarText: "DP",
-    avatarBg: "bg-amber-800",
-    rating: 5,
-    date: "4 hari lalu",
-    comment:
-      "Dark Choco Brownies-nya juara banget! Bagian atasnya shiny crust renyah dengan taburan almond slice dan chocochips melimpah, dalamnya moist dan rasa cokelatnya pekat nikmat.",
-    favoriteItem: "Dark Choco Brownies",
-    verified: true,
-    category: "brownies",
-  },
-  {
-    id: "testi-3",
     name: "Hj. Nurul Anisa",
     role: "Koordinator Pengajian & Arisan",
     avatarText: "NA",
@@ -53,10 +25,38 @@ const TESTIMONIALS_DATA: Testimonial[] = [
     rating: 5,
     date: "1 minggu lalu",
     comment:
-      "Pesan puluhan box Roti Sosis dan Roti Srikaya buat snack box acara pengajian keluarga. Rotinya masih empuk hangat, sosisnya gurih berkeju, dan selai srikayanya harum otentik. Semua tamu memuji!",
+      "Pesan buat snack box pengajian keluarga kemarin. Rotinya beneran empuk pas nyampe, sosisnya gurih dan isian srikayanya wangi manisnya pas. Tamu-tamu pada suka, praktis tinggal bagiin.",
     favoriteItem: "Roti Sosis & Roti Srikaya",
     verified: true,
     category: "roti",
+  },
+  {
+    id: "testi-2",
+    name: "Siti Rahmawati",
+    role: "Ibu Rumah Tangga, Sukoharjo",
+    avatarText: "SR",
+    avatarBg: "bg-amber-600",
+    rating: 5,
+    date: "2 hari lalu",
+    comment:
+      "Roti coklatnya lumer pas digigit, yang keju juga gurihnya pas. Cocok banget buat bekal anak sekolah karena ukurannya pas dan harganya ramah di kantong.",
+    favoriteItem: "Roti Coklat & Roti Keju",
+    verified: true,
+    category: "roti",
+  },
+  {
+    id: "testi-3",
+    name: "Dimas Prasetyo",
+    role: "Pecinta Cokelat, Kartasura",
+    avatarText: "DP",
+    avatarBg: "bg-amber-800",
+    rating: 5,
+    date: "4 hari lalu",
+    comment:
+      "Brownies-nya mantap buat teman ngopi. Bagian atasnya garing, dalamnya legit dan cokelatnya pekat tapi nggak bikin seret atau kemanisan.",
+    favoriteItem: "Dark Choco Brownies",
+    verified: true,
+    category: "brownies",
   },
   {
     id: "testi-4",
@@ -176,7 +176,7 @@ export const TestimonialsSection: React.FC = () => {
 
             <div className="flex items-center gap-2 bg-card px-3.5 py-2 rounded-xl border border-border/80 shadow-soft">
               <CheckCircle2 size={14} className="text-emerald-600" />
-              <span>100% Halal &amp; Higienis</span>
+              <span>100% Halal Resmi (ID64110055824640426)</span>
             </div>
           </div>
         </div>

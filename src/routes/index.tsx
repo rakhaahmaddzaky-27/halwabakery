@@ -44,6 +44,16 @@ import { OfflineIndicator } from "@/src/components/OfflineIndicator.tsx";
 import { TestimonialsSection } from "@/src/components/TestimonialsSection.tsx";
 import { PaymentLogos } from "@/src/components/PaymentLogos.tsx";
 import {
+  OutletLocationSection,
+  OUTLET_ADDRESS,
+  GOOGLE_MAPS_SHORT_URL,
+} from "@/src/components/OutletLocationSection.tsx";
+import {
+  HalalCertificateBadge,
+  HalalLogoSvg,
+  HALAL_CERTIFICATE_NUMBER,
+} from "@/src/components/HalalCertificateBadge.tsx";
+import {
   initAuth,
   googleSignIn,
   googleSignOut,
@@ -147,7 +157,7 @@ export const products: Product[] = [
 ];
 
 export const trustBadges = [
-  { icon: ShieldCheck, title: "100% Halal", subtitle: "Bersertifikat" },
+  { icon: ShieldCheck, title: "100% Halal Resmi", subtitle: `No. ${HALAL_CERTIFICATE_NUMBER}` },
   { icon: Flame, title: "Freshly Baked", subtitle: "Setiap hari" },
   { icon: Award, title: "Bahan Premium", subtitle: "Kualitas terbaik" },
   { icon: Heart, title: "Tanpa Pengawet", subtitle: "Lebih alami" },
@@ -1397,6 +1407,7 @@ export default function Index() {
               ["Menu Roti", "#menu"],
               ["Keunggulan", "#keunggulan"],
               ["Cara Pesan", "#cara-pesan"],
+              ["Lokasi Outlet", "#lokasi"],
               ["Testimoni", "#testimoni"],
             ].map(([label, href]) => (
               <a
@@ -1470,6 +1481,7 @@ export default function Index() {
               ["Menu Roti", "#menu"],
               ["Keunggulan", "#keunggulan"],
               ["Cara Pesan", "#cara-pesan"],
+              ["Lokasi Outlet", "#lokasi"],
               ["Testimoni", "#testimoni"],
             ].map(([label, href]) => (
               <a
@@ -1510,11 +1522,14 @@ export default function Index() {
           id="beranda"
           className="relative scroll-mt-20 border-b border-border/60 overflow-hidden"
         >
-          <div className="mx-auto grid min-h-[calc(100svh-80px)] max-w-7xl items-center gap-10 px-5 py-12 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
+          <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 pt-6 pb-12 sm:pt-8 sm:pb-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:pt-10 lg:pb-20">
             <div className="relative z-10 max-w-2xl animate-rise">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary-soft px-3.5 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-foreground">
-                <ShieldCheck className="text-primary" size={15} />
-                100% Halal • Dipanggang Hari Ini
+              <div className="mb-5 flex flex-wrap items-center gap-2.5">
+                <HalalCertificateBadge variant="pill" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3.5 py-1.5 text-xs font-bold text-foreground shadow-2xs">
+                  <Flame className="text-primary" size={13} />
+                  Dipanggang Hari Ini
+                </span>
               </div>
               <h1 className="font-display text-5xl leading-[1.08] font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
                 Kehangatan Roti Segar &amp;{" "}
@@ -1652,6 +1667,11 @@ export default function Index() {
             ))}
           </div>
         </section>
+
+        {/* Halal Indonesia Official Banner */}
+        <div className="px-5 pt-10 sm:pt-14 max-w-7xl mx-auto">
+          <HalalCertificateBadge variant="banner" />
+        </div>
 
         {/* Menu Section */}
         <section id="menu" className="scroll-mt-20 px-5 py-20 lg:px-8 lg:py-28">
@@ -1999,13 +2019,16 @@ export default function Index() {
           </div>
         </section>
 
+        {/* Outlet Location & Google Maps Embed */}
+        <OutletLocationSection />
+
         {/* Customer Reviews & Testimonials Section */}
         <TestimonialsSection />
       </main>
 
       {/* Single, Clean Footer */}
       <footer className="bg-foreground text-primary-foreground">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.3fr_1fr_1fr] lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.1fr_1fr_1fr] lg:px-8">
           <div>
             <div className="flex items-center">
               <img
@@ -2029,15 +2052,38 @@ export default function Index() {
 
           <div>
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-primary">
-              Kunjungi Kami
+              Sertifikasi Halal Resmi
             </h3>
-            <p className="mt-4 flex items-start gap-2.5 text-sm text-primary-foreground/80">
-              <Store size={18} className="shrink-0 text-primary mt-0.5" />
-              <span>Setiap Hari: 08.00 - 20.00 WIB</span>
+            <div className="mt-4">
+              <HalalCertificateBadge variant="compact" />
+            </div>
+            <p className="mt-2.5 text-xs leading-relaxed text-primary-foreground/70">
+              Terdaftar resmi di BPJPH Kementerian Agama RI. Jaminan 100% halal dan higienis.
             </p>
-            <p className="mt-3 flex items-start gap-2.5 text-sm text-primary-foreground/80">
+          </div>
+
+          <div>
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-primary">
+              Outlet &amp; Lokasi
+            </h3>
+            <p className="mt-4 flex items-start gap-2.5 text-xs sm:text-sm text-primary-foreground/80 leading-relaxed">
               <MapPin size={18} className="shrink-0 text-primary mt-0.5" />
-              <span>Ambil langsung di toko atau kirim via Kurir Pribadi Halwa</span>
+              <span>{OUTLET_ADDRESS}</span>
+            </p>
+            <div className="mt-2.5 pl-7">
+              <a
+                href={GOOGLE_MAPS_SHORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+              >
+                <span>Buka di Google Maps</span>
+                <ExternalLink size={12} />
+              </a>
+            </div>
+            <p className="mt-3 flex items-start gap-2.5 text-xs sm:text-sm text-primary-foreground/80">
+              <Store size={18} className="shrink-0 text-primary mt-0.5" />
+              <span>Setiap Hari: 08.00 - 20.00 WITA</span>
             </p>
           </div>
 
@@ -2334,13 +2380,27 @@ export default function Index() {
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-card text-primary shadow-xs">
                             <Store size={18} />
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm font-bold text-foreground">
-                              Ambil Langsung di Toko
+                              Ambil Langsung di Toko (Pickup)
                             </p>
-                            <p className="mt-1 text-xs leading-relaxed text-foreground/75">
-                              Anda tidak perlu mengisi alamat. Pesanan akan langsung disiapkan di toko Halwa Bakery dan siap Anda ambil saat pesanan siap.
+                            <p className="mt-1 text-xs leading-relaxed text-foreground/80">
+                              Pesanan akan disiapkan di toko Halwa Bakery dan siap diambil saat selesai dipanggang.
                             </p>
+                            <div className="mt-2.5 rounded-xl bg-background/90 p-3 text-xs border border-border/80">
+                              <span className="font-bold text-primary block">Alamat Pengambilan:</span>
+                              <span className="text-foreground font-medium block mt-0.5">{OUTLET_ADDRESS}</span>
+                              <a
+                                href={GOOGLE_MAPS_SHORT_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-primary font-bold hover:underline mt-1.5"
+                              >
+                                <MapPin size={12} />
+                                <span>Petunjuk Arah Google Maps</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            </div>
                           </div>
                         </div>
 
