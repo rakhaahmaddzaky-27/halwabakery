@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Cloud,
   CloudUpload,
+  DollarSign,
+  Edit3,
   ExternalLink,
   FileSpreadsheet,
   Flame,
@@ -29,11 +31,15 @@ import {
   Save,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   Store,
+  Tag,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+import { AddProductModal } from "@/src/components/AddProductModal.tsx";
+import { EditPriceModal } from "@/src/components/EditPriceModal.tsx";
 import { halwaMark, heroFallback, productFallbackImage } from "@/src/assets/fallbacks.ts";
 import { defaultProductImages, officialProductImages } from "@/src/assets/productImages.ts";
 import { REAL_HERO_IMAGE, REAL_PRODUCT_IMAGES } from "@/src/assets/realPhotos.ts";
@@ -83,7 +89,7 @@ export type Product = {
   stock: number;
 };
 
-export const products: Product[] = [
+export const defaultProducts: Product[] = [
   {
     id: 1,
     name: "Roti Sosis",
@@ -155,6 +161,8 @@ export const products: Product[] = [
     stock: 20,
   },
 ];
+
+export const products: Product[] = defaultProducts;
 
 export const trustBadges = [
   { icon: ShieldCheck, title: "100% Halal Resmi", subtitle: `No. ${HALAL_CERTIFICATE_NUMBER}` },
@@ -276,6 +284,79 @@ export default function Index() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
+  // Custom Products (Varian Baru yang ditambahkan Pengelola)
+  const [customProducts, setCustomProducts] = useState<Product[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("halwa_custom_products");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return [];
+  });
+
+  // Custom Prices State (Perubahan harga oleh pengelola)
+  const [customPrices, setCustomPrices] = useState<Record<number, number>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("halwa_custom_prices");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
+
+  const saveCustomPrices = (newPrices: Record<number, number>) => {
+    setCustomPrices(newPrices);
+    try {
+      localStorage.setItem("halwa_custom_prices", JSON.stringify(newPrices));
+    } catch (e) {
+      console.warn("Storage quota exceeded", e);
+    }
+    // Broadcast & persist to backend server
+    fetch("/api/store/prices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prices: newPrices }),
+    }).catch(() => {});
+  };
+
+  // Helper untuk mendapatkan harga default bawaan
+  const getDefaultPrice = (productId: number): number => {
+    const def = defaultProducts.find((p) => p.id === productId);
+    if (def) return def.price;
+    const cust = customProducts.find((p) => p.id === productId);
+    if (cust) return cust.price;
+    return 6000;
+  };
+
+  // Gabungan semua varian roti (bawaan + kustom) dengan harga terkini
+  const products: Product[] = useMemo(() => {
+    return [...defaultProducts, ...customProducts].map((p) => ({
+      ...p,
+      price: customPrices[p.id] ?? p.price,
+    }));
+  }, [customProducts, customPrices]);
+
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+  const [editingPriceProduct, setEditingPriceProduct] = useState<Product | null>(null);
+  const [productToast, setProductToast] = useState<string | null>(null);
+
+  const handleUpdateProductPrice = (productId: number, newPrice: number) => {
+    const updated = { ...customPrices, [productId]: newPrice };
+    saveCustomPrices(updated);
+    setProductToast(`Harga produk berhasil diperbarui menjadi ${formatPrice(newPrice)}`);
+    setTimeout(() => setProductToast(null), 3000);
+  };
+
+  const handleResetProductPrice = (productId: number) => {
+    const updated = { ...customPrices };
+    delete updated[productId];
+    saveCustomPrices(updated);
+    setProductToast("Harga produk dikembalikan ke harga standar.");
+    setTimeout(() => setProductToast(null), 3000);
+  };
+
   // Stock State (saved in localStorage)
   const [stock, setStock] = useState<Record<number, number>>(() => {
     if (typeof window !== "undefined") {
@@ -284,9 +365,17 @@ export default function Index() {
         if (saved) {
           const parsed = JSON.parse(saved);
           const initialMap: Record<number, number> = {};
-          products.forEach((p) => {
+          defaultProducts.forEach((p) => {
             initialMap[p.id] = typeof parsed[p.id] === "number" ? parsed[p.id] : p.stock;
           });
+          try {
+            const savedCustom = JSON.parse(localStorage.getItem("halwa_custom_products") || "[]");
+            if (Array.isArray(savedCustom)) {
+              savedCustom.forEach((p: Product) => {
+                initialMap[p.id] = typeof parsed[p.id] === "number" ? parsed[p.id] : p.stock;
+              });
+            }
+          } catch {}
           return initialMap;
         }
       } catch {
@@ -294,7 +383,7 @@ export default function Index() {
       }
     }
     const initialMap: Record<number, number> = {};
-    products.forEach((p) => {
+    defaultProducts.forEach((p) => {
       initialMap[p.id] = p.stock;
     });
     return initialMap;
@@ -313,6 +402,69 @@ export default function Index() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stock: newStock }),
     }).catch(() => {});
+  };
+
+  const handleAddProduct = (newProduct: Product, initialStock: number) => {
+    const updated = [...customProducts, newProduct];
+    setCustomProducts(updated);
+    try {
+      localStorage.setItem("halwa_custom_products", JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Storage quota exceeded", e);
+    }
+
+    const newStock = { ...stock, [newProduct.id]: initialStock };
+    saveStock(newStock);
+
+    if (newProduct.image) {
+      saveProductImage(newProduct.id, newProduct.image);
+    }
+
+    // Broadcast & persist to backend server
+    fetch("/api/store/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customProducts: updated }),
+    }).catch(() => {});
+
+    setProductToast(`Varian baru "${newProduct.name}" berhasil ditambahkan ke menu!`);
+    setTimeout(() => setProductToast(null), 4000);
+
+    // Smooth scroll to new product
+    setTimeout(() => {
+      const el = document.getElementById(`product-card-${newProduct.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 400);
+  };
+
+  const handleDeleteProduct = (productId: number, productName: string) => {
+    const ok = window.confirm(`Apakah Anda yakin ingin menghapus varian "${productName}" dari katalog Halwa Bakery?`);
+    if (!ok) return;
+
+    const updated = customProducts.filter((p) => p.id !== productId);
+    setCustomProducts(updated);
+    try {
+      localStorage.setItem("halwa_custom_products", JSON.stringify(updated));
+    } catch {}
+
+    // Remove from cart if customer had added it
+    setCart((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+
+    // Broadcast & persist to backend server
+    fetch("/api/store/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customProducts: updated }),
+    }).catch(() => {});
+
+    setProductToast(`Varian "${productName}" telah dihapus.`);
+    setTimeout(() => setProductToast(null), 3500);
   };
 
   // Admin Stock Modal state
@@ -422,12 +574,23 @@ export default function Index() {
     } catch {}
   };
 
-  const openAdminStockModal = () => {
+  // Google Sheets Integration & Admin Tabs State
+  const [adminTab, setAdminTab] = useState<"manual" | "prices" | "sheets">("manual");
+  const [adminPriceInputs, setAdminPriceInputs] = useState<Record<number, number>>({});
+  const [adminPriceCategoryFilter, setAdminPriceCategoryFilter] = useState<Category>("Semua");
+
+  const openAdminStockModal = (tab: "manual" | "prices" | "sheets" = "manual") => {
     if (!isAdmin) {
       setIsAdminAuthModalOpen(true);
       return;
     }
     setAdminStockInputs({ ...stock });
+    const currentPricesMap: Record<number, number> = {};
+    products.forEach((p) => {
+      currentPricesMap[p.id] = p.price;
+    });
+    setAdminPriceInputs(currentPricesMap);
+    setAdminTab(tab);
     setIsAdminStockModalOpen(true);
     setAdminSavedToast(false);
   };
@@ -438,6 +601,38 @@ export default function Index() {
       return;
     }
     setIsPhotoManagerOpen(true);
+  };
+
+  const handleSaveAdminPrices = () => {
+    const updatedPrices = { ...customPrices };
+    products.forEach((p) => {
+      const val = Math.max(500, Math.floor(Number(adminPriceInputs[p.id]) || p.price));
+      const defPrice = getDefaultPrice(p.id);
+      if (val !== defPrice) {
+        updatedPrices[p.id] = val;
+      } else {
+        delete updatedPrices[p.id];
+      }
+    });
+    saveCustomPrices(updatedPrices);
+    setAdminSavedToast(true);
+    setTimeout(() => {
+      setAdminSavedToast(false);
+      setIsAdminStockModalOpen(false);
+    }, 1000);
+  };
+
+  const handleResetAllAdminPrices = () => {
+    const ok = window.confirm("Kembalikan harga semua produk ke harga standar Halwa Bakery?");
+    if (!ok) return;
+    saveCustomPrices({});
+    const resetMap: Record<number, number> = {};
+    products.forEach((p) => {
+      resetMap[p.id] = getDefaultPrice(p.id);
+    });
+    setAdminPriceInputs(resetMap);
+    setAdminSavedToast(true);
+    setTimeout(() => setAdminSavedToast(false), 2000);
   };
 
   const handleSaveAdminStock = () => {
@@ -476,7 +671,6 @@ export default function Index() {
   };
 
   // Google Sheets Integration State
-  const [adminTab, setAdminTab] = useState<"manual" | "sheets">("manual");
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => {
@@ -550,6 +744,20 @@ export default function Index() {
           } catch {}
         }
 
+        if (data.prices && typeof data.prices === "object" && Object.keys(data.prices).length > 0) {
+          setCustomPrices((prev) => ({ ...prev, ...data.prices }));
+          try {
+            localStorage.setItem("halwa_custom_prices", JSON.stringify(data.prices));
+          } catch {}
+        }
+
+        if (Array.isArray(data.customProducts) && data.customProducts.length > 0) {
+          setCustomProducts(data.customProducts);
+          try {
+            localStorage.setItem("halwa_custom_products", JSON.stringify(data.customProducts));
+          } catch {}
+        }
+
         const serverHasPhotos = data.productImages && typeof data.productImages === "object" && Object.keys(data.productImages).length > 0;
         if (serverHasPhotos) {
           setProductImages((prev) => ({ ...prev, ...data.productImages }));
@@ -612,6 +820,22 @@ export default function Index() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ productImages: parsedPhotos }),
+              }).catch(() => {});
+            }
+          } catch {}
+        }
+
+        // Auto-migration: Jika tersimpan penyesuaian harga di perangkat, sinkronkan ke server
+        const localPricesStr = localStorage.getItem("halwa_custom_prices");
+        if (localPricesStr && (!data.prices || Object.keys(data.prices).length === 0)) {
+          try {
+            const parsedPrices = JSON.parse(localPricesStr);
+            if (parsedPrices && Object.keys(parsedPrices).length > 0) {
+              setCustomPrices((prev) => ({ ...prev, ...parsedPrices }));
+              fetch("/api/store/prices", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prices: parsedPrices }),
               }).catch(() => {});
             }
           } catch {}
@@ -1349,11 +1573,35 @@ export default function Index() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={openAdminStockModal}
+              onClick={() => setIsAddProductModalOpen(true)}
+              className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground shadow-2xs hover:bg-primary-strong transition cursor-pointer flex items-center gap-1"
+              title="Tambah varian produk roti atau kue baru"
+            >
+              <Plus size={12} />
+              <span>+ Tambah Varian</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openAdminStockModal("manual")}
               className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-white/20 transition cursor-pointer flex items-center gap-1"
+              title="Kelola ketersediaan stok roti"
             >
               <Boxes size={12} />
               <span>Admin Stok</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openAdminStockModal("prices")}
+              className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-white/20 transition cursor-pointer flex items-center gap-1"
+              title="Atur harga jual setiap produk Halwa Bakery"
+            >
+              <Tag size={12} />
+              <span>Ubah Harga</span>
+              {Object.keys(customPrices).length > 0 && (
+                <span className="ml-0.5 rounded-full bg-primary text-primary-foreground px-1 py-0.2 text-[9px] font-extrabold">
+                  {Object.keys(customPrices).length}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -1720,6 +1968,18 @@ export default function Index() {
                 {isAdmin && (
                   <button
                     type="button"
+                    onClick={() => setIsAddProductModalOpen(true)}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-primary px-4.5 text-xs font-bold text-primary-foreground shadow-gold transition hover:bg-primary-strong active:scale-95 cursor-pointer"
+                    title="Tambah varian produk roti atau kue baru"
+                  >
+                    <Plus size={16} />
+                    <span>Tambah Varian Baru</span>
+                  </button>
+                )}
+
+                {isAdmin && (
+                  <button
+                    type="button"
                     onClick={openPhotoManagerModal}
                     className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-primary/40 bg-primary-soft px-4 text-xs font-bold text-primary-strong shadow-xs transition hover:bg-primary-soft/80 active:scale-95 cursor-pointer"
                     title="Buka panel kelola foto untuk setiap roti"
@@ -1737,12 +1997,29 @@ export default function Index() {
                 {isAdmin && (
                   <button
                     type="button"
-                    onClick={openAdminStockModal}
+                    onClick={() => openAdminStockModal("manual")}
                     className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-4 text-xs font-bold text-foreground shadow-xs transition hover:bg-muted hover:border-primary/50 active:scale-95 cursor-pointer"
                     title="Buka panel manajemen stok roti"
                   >
                     <Boxes size={16} className="text-primary" />
                     <span>Admin Stok</span>
+                  </button>
+                )}
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => openAdminStockModal("prices")}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-card px-4 text-xs font-bold text-foreground shadow-xs transition hover:bg-muted hover:border-primary/50 active:scale-95 cursor-pointer"
+                    title="Buka panel penyesuaian harga jual produk"
+                  >
+                    <Tag size={16} className="text-primary" />
+                    <span>Ubah Harga</span>
+                    {Object.keys(customPrices).length > 0 && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-extrabold text-primary-foreground">
+                        {Object.keys(customPrices).length}
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
@@ -1889,6 +2166,28 @@ export default function Index() {
                               {product.category}
                             </span>
 
+                            {customProducts.some((cp) => cp.id === product.id) && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-extrabold text-primary">
+                                <Sparkles size={10} />
+                                <span>Varian Baru</span>
+                              </span>
+                            )}
+
+                            {isAdmin && customProducts.some((cp) => cp.id === product.id) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProduct(product.id, product.name);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive hover:bg-destructive hover:text-white transition cursor-pointer"
+                                title={`Hapus varian ${product.name}`}
+                              >
+                                <Trash2 size={11} />
+                                <span>Hapus</span>
+                              </button>
+                            )}
+
                             {/* Badge Sisa Stok */}
                             {isOutOfStock ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-0.5 text-[10px] font-bold text-destructive">
@@ -1912,9 +2211,36 @@ export default function Index() {
                             {product.name}
                           </h3>
                         </div>
-                        <span className="shrink-0 rounded-xl bg-primary-soft px-3 py-1.5 text-sm font-extrabold text-primary-strong">
-                          {formatPrice(product.price)}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`rounded-xl px-3 py-1.5 text-sm font-extrabold transition ${
+                              customPrices[product.id]
+                                ? "bg-primary text-primary-foreground shadow-2xs"
+                                : "bg-primary-soft text-primary-strong"
+                            }`}
+                            title={
+                              customPrices[product.id]
+                                ? `Harga diatur khusus oleh pengelola (Harga standar: ${formatPrice(getDefaultPrice(product.id))})`
+                                : undefined
+                            }
+                          >
+                            {formatPrice(product.price)}
+                          </span>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingPriceProduct(product);
+                              }}
+                              className="grid h-8 w-8 place-items-center rounded-xl border border-primary/30 bg-background text-primary shadow-2xs hover:bg-primary hover:text-white transition cursor-pointer"
+                              title={`Ubah harga jual ${product.name}`}
+                              aria-label={`Ubah harga jual ${product.name}`}
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <p className="min-h-12 flex-1 text-sm leading-6 text-muted-foreground">
@@ -3027,22 +3353,36 @@ export default function Index() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAdminStockModalOpen(false)}
-                className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer"
-                aria-label="Tutup panel stok"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdminStockModalOpen(false);
+                    setIsAddProductModalOpen(true);
+                  }}
+                  className="hidden sm:flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary-soft px-3 py-1.5 text-xs font-bold text-primary-strong hover:bg-primary-soft/80 transition cursor-pointer"
+                  title="Tambah varian produk baru"
+                >
+                  <Plus size={13} />
+                  <span>+ Tambah Varian</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminStockModalOpen(false)}
+                  className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer"
+                  aria-label="Tutup panel stok"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex border-b border-border bg-muted/40 px-5 pt-3 gap-2">
+            <div className="flex border-b border-border bg-muted/40 px-5 pt-3 gap-2 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setAdminTab("manual")}
-                className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer ${
+                className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer shrink-0 ${
                   adminTab === "manual"
                     ? "border-primary bg-card text-primary shadow-xs"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3053,8 +3393,25 @@ export default function Index() {
               </button>
               <button
                 type="button"
+                onClick={() => setAdminTab("prices")}
+                className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer shrink-0 ${
+                  adminTab === "prices"
+                    ? "border-primary bg-card text-primary shadow-xs"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Tag size={15} />
+                <span>Ubah Harga Produk</span>
+                {Object.keys(customPrices).length > 0 && (
+                  <span className="ml-1 rounded-full bg-primary text-primary-foreground px-1.5 py-0.2 text-[9px] font-extrabold">
+                    {Object.keys(customPrices).length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={() => setAdminTab("sheets")}
-                className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer ${
+                className={`flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold transition border-b-2 cursor-pointer shrink-0 ${
                   adminTab === "sheets"
                     ? "border-primary bg-card text-primary shadow-xs"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3163,7 +3520,18 @@ export default function Index() {
                                   {p.category}
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground">{formatPrice(p.price)}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-xs font-semibold text-muted-foreground">{formatPrice(p.price)}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingPriceProduct(p)}
+                                  className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold text-primary-strong hover:bg-primary/20 transition cursor-pointer"
+                                  title="Ubah harga produk ini"
+                                >
+                                  <Edit3 size={10} />
+                                  <span>Ubah Harga</span>
+                                </button>
+                              </div>
                               <div className="mt-1">
                                 {isZero ? (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
@@ -3313,6 +3681,215 @@ export default function Index() {
                     >
                       <Save size={15} />
                       <span>Simpan Perubahan Stok</span>
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : adminTab === "prices" ? (
+              <>
+                {/* Quick Category Filter & Actions */}
+                <div className="border-b border-border/70 bg-primary-soft/30 px-5 py-3.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-foreground mr-1">Kategori:</span>
+                      {(["Semua", "Roti", "Brownies", "Kue"] as Category[]).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setAdminPriceCategoryFilter(cat)}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                            adminPriceCategoryFilter === cat
+                              ? "bg-foreground text-primary-foreground shadow-2xs"
+                              : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-[11px]">
+                        {Object.keys(customPrices).length > 0 ? (
+                          <span className="font-semibold text-primary">
+                            {Object.keys(customPrices).length} produk dengan harga kustom
+                          </span>
+                        ) : (
+                          "Semua produk memakai harga standar"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price Edit List */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+                  <div className="space-y-3">
+                    {products
+                      .filter(
+                        (p) =>
+                          adminPriceCategoryFilter === "Semua" ||
+                          p.category === adminPriceCategoryFilter
+                      )
+                      .map((p) => {
+                        const currentVal =
+                          adminPriceInputs[p.id] !== undefined
+                            ? adminPriceInputs[p.id]
+                            : p.price;
+                        const defaultPrice = getDefaultPrice(p.id);
+                        const isModified = currentVal !== defaultPrice;
+                        const currentImage = productImages[p.id] || p.image;
+
+                        return (
+                          <div
+                            key={p.id}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-3.5 transition ${
+                              isModified
+                                ? "border-primary/50 bg-primary-soft/20 shadow-2xs"
+                                : "border-border bg-card"
+                            }`}
+                          >
+                            {/* Product Info */}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+                                <img
+                                  src={currentImage}
+                                  alt={p.name}
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src =
+                                      defaultProductImages[p.id] ||
+                                      productFallbackImage(p.name, p.category);
+                                  }}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-bold text-foreground truncate">
+                                    {p.name}
+                                  </h4>
+                                  <span className="text-[10px] font-extrabold uppercase text-primary">
+                                    {p.category}
+                                  </span>
+                                  {isModified && (
+                                    <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[9px] font-extrabold shadow-2xs">
+                                      Harga Khusus
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-xs">
+                                  <span className="text-muted-foreground">
+                                    Standar: {formatPrice(defaultPrice)}
+                                  </span>
+                                  {isModified && (
+                                    <span className="font-bold text-primary">
+                                      → Saat ini: {formatPrice(currentVal)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Price Stepper & Quick Adjustment Controls */}
+                            <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-center">
+                              {/* Rp Input Box */}
+                              <div className="flex items-center rounded-xl border border-border bg-background px-2.5 py-1 focus-within:border-primary shadow-xs">
+                                <span className="text-xs font-bold text-muted-foreground mr-1 select-none">
+                                  Rp
+                                </span>
+                                <input
+                                  type="number"
+                                  min={500}
+                                  step={500}
+                                  value={currentVal}
+                                  onChange={(e) => {
+                                    const val = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                                    setAdminPriceInputs((prev) => ({
+                                      ...prev,
+                                      [p.id]: val,
+                                    }));
+                                  }}
+                                  className="w-24 text-sm font-extrabold text-foreground bg-transparent text-right outline-none"
+                                />
+                              </div>
+
+                              {/* Quick Adjustment Pills */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdminPriceInputs((prev) => ({
+                                      ...prev,
+                                      [p.id]: Math.max(500, currentVal - 1000),
+                                    }));
+                                  }}
+                                  className="rounded-lg border border-border bg-card px-2 py-1.5 text-[11px] font-bold text-foreground hover:border-primary hover:text-primary transition cursor-pointer"
+                                  title="Kurangi Rp 1.000"
+                                >
+                                  -1rb
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdminPriceInputs((prev) => ({
+                                      ...prev,
+                                      [p.id]: currentVal + 1000,
+                                    }));
+                                  }}
+                                  className="rounded-lg border border-border bg-card px-2 py-1.5 text-[11px] font-bold text-foreground hover:border-primary hover:text-primary transition cursor-pointer"
+                                  title="Tambah Rp 1.000"
+                                >
+                                  +1rb
+                                </button>
+                                {isModified && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAdminPriceInputs((prev) => ({
+                                        ...prev,
+                                        [p.id]: defaultPrice,
+                                      }));
+                                    }}
+                                    className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-500/20 transition cursor-pointer"
+                                    title="Kembalikan harga produk ini ke standar"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between border-t border-border bg-muted/30 p-4 sm:p-5">
+                  <button
+                    type="button"
+                    onClick={handleResetAllAdminPrices}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive transition cursor-pointer"
+                    title="Kembalikan semua harga produk ke harga standar"
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset Semua Harga ke Standar</span>
+                  </button>
+
+                  <div className="flex items-center gap-2.5">
+                    <Button
+                      onClick={() => setIsAdminStockModalOpen(false)}
+                      className="rounded-xl border border-border bg-card px-4 text-xs font-bold text-foreground hover:bg-muted min-h-10"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      onClick={handleSaveAdminPrices}
+                      className="rounded-xl bg-primary px-5 text-xs font-bold text-primary-foreground hover:bg-primary-strong shadow-gold min-h-10 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Save size={15} />
+                      <span>Simpan Perubahan Harga</span>
                     </Button>
                   </div>
                 </div>
@@ -3696,6 +4273,39 @@ export default function Index() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Varian Baru (Khusus Pengelola) */}
+      <AddProductModal
+        isOpen={isAddProductModalOpen}
+        onClose={() => setIsAddProductModalOpen(false)}
+        onAddProduct={handleAddProduct}
+        compressImageFile={compressImageFile}
+        existingProductsCount={products.length}
+      />
+
+      {/* Modal Ubah Harga Khusus Produk Tertentu */}
+      <EditPriceModal
+        isOpen={Boolean(editingPriceProduct)}
+        onClose={() => setEditingPriceProduct(null)}
+        product={editingPriceProduct}
+        defaultPrice={editingPriceProduct ? getDefaultPrice(editingPriceProduct.id) : 0}
+        currentPrice={
+          editingPriceProduct
+            ? (customPrices[editingPriceProduct.id] ?? editingPriceProduct.price)
+            : 0
+        }
+        onSavePrice={handleUpdateProductPrice}
+        onResetPrice={handleResetProductPrice}
+        isCustomized={Boolean(editingPriceProduct && customPrices[editingPriceProduct.id])}
+      />
+
+      {/* Floating Toast Notifikasi Penambahan/Penghapusan Varian */}
+      {productToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 rounded-2xl bg-[#2A160E] border border-primary/40 px-5 py-3 text-xs font-bold text-[#F7F2E8] shadow-lift animate-rise">
+          <CheckCircle2 size={16} className="text-primary shrink-0" />
+          <span>{productToast}</span>
         </div>
       )}
     </div>

@@ -7,7 +7,9 @@ interface StoreData {
   spreadsheetId: string;
   spreadsheetUrl: string;
   stock: Record<number, number>;
+  prices: Record<number, number>;
   productImages: Record<number, string>;
+  customProducts: any[];
   heroImage: string;
   lastSyncTime: string;
 }
@@ -19,7 +21,9 @@ const defaultData: StoreData = {
   spreadsheetId: "",
   spreadsheetUrl: "",
   stock: { 1: 15, 2: 12, 3: 10, 4: 8, 5: 4, 6: 15, 7: 20 },
+  prices: {},
   productImages: {},
+  customProducts: [],
   heroImage: "",
   lastSyncTime: "",
 };
@@ -69,7 +73,9 @@ function readStore(): StoreData {
       ...defaultData,
       ...parsed,
       stock: { ...defaultData.stock, ...(parsed.stock || {}) },
+      prices: { ...(parsed.prices || {}) },
       productImages: { ...(parsed.productImages || {}) },
+      customProducts: Array.isArray(parsed.customProducts) ? parsed.customProducts : [],
     };
   } catch (e) {
     console.error("Error reading store.json:", e);
@@ -157,6 +163,32 @@ async function startServer() {
     }
     writeStore(store);
     res.json({ success: true, store });
+  });
+
+  // Update custom products list (add, edit, delete)
+  app.post("/api/store/products", (req, res) => {
+    const { customProducts } = req.body;
+    if (!Array.isArray(customProducts)) {
+      res.status(400).json({ error: "Invalid customProducts array" });
+      return;
+    }
+    const store = readStore();
+    store.customProducts = customProducts;
+    writeStore(store);
+    res.json({ success: true, customProducts: store.customProducts });
+  });
+
+  // Update product prices (mode pengelola)
+  app.post("/api/store/prices", (req, res) => {
+    const { prices } = req.body;
+    if (!prices || typeof prices !== "object") {
+      res.status(400).json({ error: "Invalid prices object" });
+      return;
+    }
+    const store = readStore();
+    store.prices = { ...prices };
+    writeStore(store);
+    res.json({ success: true, prices: store.prices });
   });
 
   // Update product or hero images
