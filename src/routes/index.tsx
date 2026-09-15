@@ -58,6 +58,7 @@ import {
   HalalCertificateBadge,
   HalalLogoSvg,
   HALAL_CERTIFICATE_NUMBER,
+  HalalModal,
 } from "@/src/components/HalalCertificateBadge.tsx";
 import {
   initAuth,
@@ -165,7 +166,12 @@ export const defaultProducts: Product[] = [
 export const products: Product[] = defaultProducts;
 
 export const trustBadges = [
-  { icon: ShieldCheck, title: "100% Halal Resmi", subtitle: `No. ${HALAL_CERTIFICATE_NUMBER}` },
+  {
+    icon: ShieldCheck,
+    title: "100% Halal Resmi",
+    subtitle: "BPJPH Kemenag",
+    isHalal: true,
+  },
   { icon: Flame, title: "Freshly Baked", subtitle: "Setiap hari" },
   { icon: Award, title: "Bahan Premium", subtitle: "Kualitas terbaik" },
   { icon: Heart, title: "Tanpa Pengawet", subtitle: "Lebih alami" },
@@ -508,6 +514,7 @@ export default function Index() {
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const [adminAuthError, setAdminAuthError] = useState("");
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false);
+  const [isHalalDetailModalOpen, setIsHalalDetailModalOpen] = useState(false);
 
   // Buka dialog login pengelola jika ada parameter ?admin=true di link web
   useEffect(() => {
@@ -1896,20 +1903,38 @@ export default function Index() {
           id="keunggulan"
           className="scroll-mt-20 bg-foreground text-primary-foreground"
         >
-          <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-primary-foreground/10 px-5 sm:grid-cols-4 sm:divide-y-0 lg:px-8">
-            {trustBadges.map(({ icon: Icon, title, subtitle }) => (
+          <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-primary-foreground/10 px-3 sm:px-6 sm:grid-cols-4 sm:divide-y-0 lg:px-8">
+            {trustBadges.map(({ icon: Icon, title, subtitle, isHalal }) => (
               <div
                 key={title}
-                className="flex items-center gap-3.5 px-4 py-7 sm:px-6"
+                onClick={isHalal ? () => setIsHalalDetailModalOpen(true) : undefined}
+                className={`flex items-center gap-2.5 sm:gap-3.5 px-3.5 py-4 sm:px-5 sm:py-6 min-w-0 overflow-hidden ${
+                  isHalal
+                    ? "cursor-pointer hover:bg-white/5 active:bg-white/10 transition group select-none"
+                    : ""
+                }`}
+                title={
+                  isHalal
+                    ? "Klik untuk melihat detail Sertifikat Halal resmi BPJPH Kemenag RI"
+                    : undefined
+                }
               >
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-foreground/10 text-primary">
-                  <Icon size={22} />
+                <div className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl bg-primary-foreground/10 text-primary transition group-hover:scale-105">
+                  <Icon size={20} className="sm:w-[22px] sm:h-[22px]" />
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-primary-foreground">{title}</p>
-                  <p className="text-xs text-primary-foreground/65">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <p className="text-xs sm:text-sm font-bold text-primary-foreground truncate leading-snug">
+                    {title}
+                  </p>
+                  <p className="text-[11px] sm:text-xs text-primary-foreground/75 truncate mt-0.5 leading-snug">
                     {subtitle}
                   </p>
+                  {isHalal && (
+                    <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-primary mt-0.5 group-hover:underline">
+                      <span>Cek Sertifikat</span>
+                      <span className="text-[8px]">↗</span>
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -4307,6 +4332,11 @@ export default function Index() {
           <CheckCircle2 size={16} className="text-primary shrink-0" />
           <span>{productToast}</span>
         </div>
+      )}
+
+      {/* Modal Detail Resmi Sertifikat Halal Indonesia BPJPH */}
+      {isHalalDetailModalOpen && (
+        <HalalModal onClose={() => setIsHalalDetailModalOpen(false)} />
       )}
     </div>
   );
